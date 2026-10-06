@@ -420,23 +420,31 @@ struct DashboardView: View {
     }
 }
 
-/// A tiny read-only bar graph of an equalizer curve.
+/// A tiny read-only graph of an equalizer curve: capsules rising above or
+/// dropping below a centre line, so a flat curve reads as a calm row of dots.
 struct MiniEqualizerCurve: View {
     let bands: [Int]
 
     var body: some View {
         let peak = CGFloat(max(6, bands.map { abs($0) }.max() ?? 6))
-        HStack(alignment: .center, spacing: 5) {
-            ForEach(Array(bands.enumerated()), id: \.offset) { _, value in
-                GeometryReader { geo in
-                    let h = geo.size.height
-                    let barH = max(6, h * 0.5 + h * 0.5 * CGFloat(value) / peak)
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Color.accentColor.gradient)
-                        .frame(height: barH)
-                        .frame(maxHeight: .infinity, alignment: .center)
+        GeometryReader { geo in
+            let half = geo.size.height / 2
+            ZStack {
+                Capsule()
+                    .fill(Color.primary.opacity(0.10))
+                    .frame(height: 1)
+                HStack(spacing: 0) {
+                    ForEach(Array(bands.enumerated()), id: \.offset) { _, value in
+                        let length = 6 + (half - 3) * CGFloat(abs(value)) / peak
+                        Capsule()
+                            .fill(Color.accentColor.gradient)
+                            .frame(width: 6, height: length)
+                            .offset(y: value >= 0 ? -(length / 2 - 3) : (length / 2 - 3))
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .animation(.glass, value: bands)
     }

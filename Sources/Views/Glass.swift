@@ -61,7 +61,7 @@ struct VisualEffectBackground: NSViewRepresentable {
         view.maskImage = cornerRadius > 0 ? Self.mask(radius: cornerRadius) : nil
     }
 
-    private static func mask(radius: CGFloat) -> NSImage {
+    static func mask(radius: CGFloat) -> NSImage {
         let edge = radius * 2 + 1
         let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
             NSColor.black.setFill()

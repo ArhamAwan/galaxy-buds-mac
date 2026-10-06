@@ -4,14 +4,14 @@ import SwiftUI
 
 // MARK: - Surface
 
-/// Clear glass with a bright bevel and a soft specular sheen across the top.
+/// The bevel, tint and specular sheen drawn over the panel's glass. The blur
+/// itself is the window's content view (see `StatusBarController`).
 struct LiquidSurface: ViewModifier {
     var cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return content
-            .background(VisualEffectBackground(material: .hudWindow, cornerRadius: cornerRadius))
             .background(shape.fill(Color.black.opacity(0.08)))
             .overlay(alignment: .top) {
                 LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0)],
@@ -26,8 +26,6 @@ struct LiquidSurface: ViewModifier {
                                    startPoint: .top, endPoint: .bottom),
                     lineWidth: 1)
             )
-            .compositingGroup()
-            .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
             .environment(\.colorScheme, .dark)
     }
 }
