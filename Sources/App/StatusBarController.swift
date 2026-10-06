@@ -22,6 +22,10 @@ final class StatusBarController {
     }
 
     private static let autosaveName = "GalaxyBudsStatusItem"
+    /// Transparent margin around the glass content so its SwiftUI shadow isn't
+    /// clipped. The window shadow is off: AppKit computed it from the window's
+    /// full rectangle, which drew a box behind the rounded glass.
+    static let shadowMargin: CGFloat = 24
 
     private func setupStatusItem() {
         // Clear any remembered "hidden" state before the item reads it. Earlier
@@ -98,6 +102,7 @@ final class StatusBarController {
             rootView: MenuPopoverView(bluetooth: bluetooth) { [weak self] section in
                 self?.openDetailWindow(section: section)
             }
+            .padding(Self.shadowMargin)
         )
         let panel = NSPanel(
             contentViewController: hosting
@@ -107,7 +112,7 @@ final class StatusBarController {
         panel.level = .popUpMenu
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = false
         // Glass corners: let the SwiftUI vibrancy view draw the shape.
         hosting.view.wantsLayer = true
         hosting.view.layer?.backgroundColor = .clear
@@ -150,15 +155,18 @@ final class StatusBarController {
         let screen = statusItem?.button?.window?.screen ?? NSScreen.main
         let frame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 
+        // The window includes a transparent shadow margin on every side; place
+        // the visible glass, not the window edge, under the icon.
+        let m = Self.shadowMargin
         var origin: NSPoint
         if let anchor = statusItemAnchor() {
-            origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 4)
+            origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 6 + m)
         } else {
             // No usable status button — fall back to top-centre of the screen.
-            origin = NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 8)
+            origin = NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 8 + m)
         }
-        origin.x = min(max(frame.minX + 8, origin.x), frame.maxX - size.width - 8)
-        origin.y = min(max(frame.minY + 8, origin.y), frame.maxY - size.height - 8)
+        origin.x = min(max(frame.minX + 8 - m, origin.x), frame.maxX - size.width - 8 + m)
+        origin.y = min(max(frame.minY + 8 - m, origin.y), frame.maxY - size.height - 8 + m)
         panel.setFrameOrigin(origin)
     }
 
@@ -211,6 +219,7 @@ final class StatusBarController {
             rootView: ConnectToastView(bluetooth: bluetooth) { [weak self] in
                 self?.showPanel()
             }
+            .padding(Self.shadowMargin)
         )
         let toast = NSPanel(contentViewController: hosting)
         toast.styleMask = [.borderless, .nonactivatingPanel]
@@ -218,7 +227,7 @@ final class StatusBarController {
         toast.level = .popUpMenu
         toast.backgroundColor = .clear
         toast.isOpaque = false
-        toast.hasShadow = true
+        toast.hasShadow = false
         toast.hidesOnDeactivate = false
         hosting.view.wantsLayer = true
         hosting.view.layer?.backgroundColor = .clear

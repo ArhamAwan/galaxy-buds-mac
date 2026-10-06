@@ -26,6 +26,8 @@ struct LiquidSurface: ViewModifier {
                                    startPoint: .top, endPoint: .bottom),
                     lineWidth: 1)
             )
+            .compositingGroup()
+            .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
             .environment(\.colorScheme, .dark)
     }
 }
@@ -104,19 +106,23 @@ struct BatteryPill: View {
             }
             HStack(spacing: 2) {
                 Text(label)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+                    .fixedSize()
                 Spacer(minLength: 2)
                 if present && charging {
                     Image(systemName: "bolt.fill").font(.system(size: 8, weight: .bold))
                 }
                 Text(verbatim: present ? "\(level)%" : "—")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
                     .contentTransition(.numericText())
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 11)
+            .padding(.horizontal, 10)
         }
         .frame(height: height)
         .clipShape(Capsule())
