@@ -18,7 +18,7 @@ struct CircularBatteryGauge: View {
     var style: Style = .compact
 
     private var fraction: CGFloat { present ? CGFloat(max(0, min(100, level))) / 100 : 0 }
-    private var lineWidth: CGFloat { max(5, diameter * 0.085) }
+    private var lineWidth: CGFloat { max(4, diameter * 0.09) }
 
     private var color: Color {
         guard present else { return .secondary.opacity(0.4) }
@@ -32,7 +32,7 @@ struct CircularBatteryGauge: View {
     private var percentText: String { present ? "\(level)%" : "—" }
 
     var body: some View {
-        VStack(spacing: style == .compact ? 7 : 9) {
+        VStack(spacing: style == .compact ? 5 : 9) {
             ZStack {
                 Circle()
                     .stroke(Color.glassTrack, lineWidth: lineWidth)
@@ -74,12 +74,12 @@ struct CircularBatteryGauge: View {
             VStack(spacing: 1) {
                 if style == .compact {
                     Text(percentText)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.system(size: max(11, diameter * 0.26), weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .contentTransition(.numericText())
                 }
                 Text(label)
-                    .font(.system(size: style == .compact ? 11 : 12, weight: .medium))
+                    .font(.system(size: style == .compact ? 10 : 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
         }

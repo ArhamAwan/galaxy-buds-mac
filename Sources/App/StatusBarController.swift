@@ -9,6 +9,8 @@ import SwiftUI
 final class StatusBarController {
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
+    private var toast: NSPanel?
+    private var toastDismiss: DispatchWorkItem?
     private var detailWindow: NSWindow?
     private var outsideClickMonitor: Any?
     private let bluetooth: BluetoothManager
@@ -120,6 +122,7 @@ final class StatusBarController {
     /// Shown on launch / reopen so the user can find the app even if the
     /// menu-bar icon is hard to spot.
     func showPanel() {
+        hideToast(animated: false)
         guard panel?.isVisible != true else { return }
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -176,6 +179,66 @@ final class StatusBarController {
               rect.minY >= screen.frame.maxY - 40
         else { return nil }
         return rect
+    }
+
+    // MARK: - Connect toast
+
+    /// The compact AirPods-style "Connected" card shown when the buds connect.
+    /// Fades in under the menu-bar icon and dismisses itself.
+    func showConnectToast() {
+        guard panel?.isVisible != true else { return }
+        let toast = toast ?? makeToast()
+        self.toast = toast
+        positionPanel(toast)
+
+        toastDismiss?.cancel()
+        if !toast.isVisible {
+            toast.alphaValue = 0
+            toast.orderFront(nil)
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            toast.animator().alphaValue = 1
+        }
+
+        let dismiss = DispatchWorkItem { [weak self] in self?.hideToast(animated: true) }
+        toastDismiss = dismiss
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: dismiss)
+    }
+
+    private func makeToast() -> NSPanel {
+        let hosting = NSHostingController(
+            rootView: ConnectToastView(bluetooth: bluetooth) { [weak self] in
+                self?.showPanel()
+            }
+        )
+        let toast = NSPanel(contentViewController: hosting)
+        toast.styleMask = [.borderless, .nonactivatingPanel]
+        toast.isFloatingPanel = true
+        toast.level = .popUpMenu
+        toast.backgroundColor = .clear
+        toast.isOpaque = false
+        toast.hasShadow = true
+        toast.hidesOnDeactivate = false
+        hosting.view.wantsLayer = true
+        hosting.view.layer?.backgroundColor = .clear
+        return toast
+    }
+
+    private func hideToast(animated: Bool) {
+        toastDismiss?.cancel()
+        toastDismiss = nil
+        guard let toast, toast.isVisible else { return }
+        guard animated else {
+            toast.orderOut(nil)
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.35
+            toast.animator().alphaValue = 0
+        }, completionHandler: {
+            MainActor.assumeIsolated { toast.orderOut(nil) }
+        })
     }
 
     private func closePanel() {

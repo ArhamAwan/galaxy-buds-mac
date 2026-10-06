@@ -131,7 +131,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             forConnectNotifications: self,
             selector: #selector(deviceDidConnect(_:device:))
         )
-        attemptAutoConnect(notify: false)
+        // Notify so buds already connected at launch get the connect card.
+        attemptAutoConnect(notify: true)
     }
 
     @objc nonisolated func deviceDidConnect(

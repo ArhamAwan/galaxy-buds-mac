@@ -14,7 +14,7 @@ struct MenuPopoverView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             if bluetooth.isConnected {
                 connected
             } else if bluetooth.handedOffToPhone {
@@ -24,11 +24,11 @@ struct MenuPopoverView: View {
             }
             footer
         }
-        .padding(16)
-        .frame(width: 344)
-        .background(VisualEffectBackground(material: .popover, cornerRadius: 24))
+        .padding(12)
+        .frame(width: 300)
+        .background(VisualEffectBackground(material: .popover, cornerRadius: 20))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(Color.glassEdge, lineWidth: 0.5)
         )
         .animation(.glass, value: bluetooth.isConnected)
@@ -38,7 +38,7 @@ struct MenuPopoverView: View {
     // MARK: - Connected
 
     private var connected: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             header
             batteries
             if model?.supportsANC == true {
@@ -51,22 +51,22 @@ struct MenuPopoverView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: "earbuds")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
+                .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.accentColor))
                 .shadow(color: Color.accentColor.opacity(0.4), radius: 8, y: 4)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: deviceName)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     Circle().fill(Color.batteryGreen).frame(width: 7, height: 7)
                         .background(Circle().fill(Color.batteryGreen.opacity(0.25)).frame(width: 13, height: 13))
-                    Text("Connected").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("Connected").font(.system(size: 11)).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
@@ -82,21 +82,22 @@ struct MenuPopoverView: View {
         return HStack(spacing: 0) {
             CircularBatteryGauge(
                 level: status.batteryLeft, label: "Left",
-                present: status.batteryLeft > 0, charging: status.isLeftCharging)
+                present: status.batteryLeft > 0, charging: status.isLeftCharging,
+                diameter: 44)
                 .frame(maxWidth: .infinity)
             CircularBatteryGauge(
                 level: status.batteryRight, label: "Right",
-                present: status.batteryRight > 0, charging: status.isRightCharging)
+                present: status.batteryRight > 0, charging: status.isRightCharging,
+                diameter: 44)
                 .frame(maxWidth: .infinity)
             if showCase {
                 CircularBatteryGauge(
                     level: status.batteryCase, label: "Case",
-                    present: status.batteryCase > 0, kind: .budsCase)
+                    present: status.batteryCase > 0, diameter: 44, kind: .budsCase)
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.vertical, 2)
-        .glassCard(padding: 12)
+        .glassCard(padding: 10)
     }
 
     /// Listen mode plus ANC strength. Strength only means anything while ANC is
@@ -104,22 +105,24 @@ struct MenuPopoverView: View {
     /// resizing under the pointer.
     private var listenModule: some View {
         let ancActive = status.noiseControlMode == .anc
-        return VStack(spacing: 10) {
+        return VStack(spacing: 8) {
             GlassSectionHeader(title: "Listen mode",
                                value: LocalizedStringKey(status.noiseControlMode.displayName))
             ListenModePicker(
                 modes: model?.listenModes ?? [],
-                selection: status.noiseControlMode
+                selection: status.noiseControlMode,
+                height: 42
             ) { bluetooth.setNoiseControl($0) }
 
             HStack(spacing: 12) {
                 Text("ANC strength")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize()
                 AncStrengthStepper(
                     level: status.ancLevel,
-                    count: model?.ancLevelCount ?? 2
+                    count: model?.ancLevelCount ?? 2,
+                    height: 18
                 ) { bluetooth.setAncLevel($0) }
             }
             .padding(.horizontal, 2)
@@ -127,7 +130,7 @@ struct MenuPopoverView: View {
             .opacity(ancActive ? 1 : 0.35)
             .animation(.glass, value: ancActive)
         }
-        .glassCard()
+        .glassCard(padding: 10)
     }
 
     /// Control Center–style toggle tiles.
@@ -153,25 +156,26 @@ struct MenuPopoverView: View {
         active: Bool, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 30, height: 30)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 26, height: 26)
                     .background(Circle().fill(active ? Color.white.opacity(0.22) : Color.glassTrack))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 13, weight: .semibold))
-                    Text(subtitle).font(.system(size: 11)).opacity(0.75)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                    Text(subtitle).font(.system(size: 10)).opacity(0.75).lineLimit(1)
                 }
+                Spacer(minLength: 0)
             }
             .foregroundStyle(active ? Color.white : Color.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .padding(8)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(active ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.glassCard))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.glassEdge, lineWidth: 0.5)
             )
             .animation(.glass, value: active)
@@ -186,7 +190,7 @@ struct MenuPopoverView: View {
         let presets: [EqualizerPreset] = supportsCustom
             ? EqualizerPreset.allCases
             : EqualizerPreset.allCases.filter { $0 != .custom }
-        return VStack(spacing: 10) {
+        return VStack(spacing: 8) {
             GlassSectionHeader(title: "Equalizer",
                                value: LocalizedStringKey(status.equalizerPreset.displayName))
             EqualizerPresetGrid(
@@ -195,7 +199,7 @@ struct MenuPopoverView: View {
                 columns: 3, compact: true
             ) { bluetooth.setEqualizer($0) }
         }
-        .glassCard()
+        .glassCard(padding: 10)
     }
 
     // MARK: - Footer
@@ -205,9 +209,9 @@ struct MenuPopoverView: View {
             if bluetooth.isConnected {
                 Button { openDetail(.overview) } label: {
                     Text("Galaxy Buds Settings…")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 38)
+                        .frame(height: 30)
                         .glassCard(cornerRadius: 12, padding: 0)
                 }
                 .buttonStyle(.pressable)
@@ -224,9 +228,9 @@ struct MenuPopoverView: View {
     private func squareButton(_ symbol: String, help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 38, height: 38)
+                .frame(width: 30, height: 30)
                 .glassCard(cornerRadius: 12, padding: 0)
         }
         .buttonStyle(.pressable)
@@ -239,7 +243,7 @@ struct MenuPopoverView: View {
             Image(systemName: symbol)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: 28, height: 28)
                 .background(Circle().fill(Color.glassCard))
         }
         .buttonStyle(.pressable)
@@ -324,11 +328,11 @@ struct EqualizerPresetGrid: View {
             Group {
                 if compact {
                     Text(LocalizedStringKey(preset.displayName))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
+                        .frame(height: 26)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Image(systemName: preset.iconName)
@@ -343,7 +347,7 @@ struct EqualizerPresetGrid: View {
             }
             .foregroundStyle(selected ? Color.white : Color.primary)
             .background(
-                RoundedRectangle(cornerRadius: compact ? 10 : 16, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 8 : 16, style: .continuous)
                     .fill(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.glassTrack))
                     .shadow(color: selected ? Color.accentColor.opacity(0.35) : .clear, radius: 6, y: 3)
             )
