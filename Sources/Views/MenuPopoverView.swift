@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// The compact glass panel shown from the menu-bar icon — a Control Center
-/// style quick view. Detailed controls live in the settings window.
+/// The menu-bar panel — "Liquid Glass": clear glass, battery pills that fill
+/// like liquid, a stretching mode bar, a fill slider for ANC strength and round
+/// quick toggles. Detailed controls live in the settings window.
 struct MenuPopoverView: View {
     @Bindable var bluetooth: BluetoothManager
     let openDetail: (DashboardSection) -> Void
@@ -14,7 +15,7 @@ struct MenuPopoverView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             if bluetooth.isConnected {
                 connected
             } else if bluetooth.handedOffToPhone {
@@ -24,13 +25,9 @@ struct MenuPopoverView: View {
             }
             footer
         }
-        .padding(12)
+        .padding(14)
         .frame(width: 300)
-        .background(VisualEffectBackground(material: .popover, cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.glassEdge, lineWidth: 0.5)
-        )
+        .liquidSurface(cornerRadius: 30)
         .animation(.glass, value: bluetooth.isConnected)
         .focusEffectDisabled() // no focus ring on the auto-focused default button
     }
@@ -38,217 +35,149 @@ struct MenuPopoverView: View {
     // MARK: - Connected
 
     private var connected: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 14) {
             header
             batteries
             if model?.supportsANC == true {
-                listenModule
+                LiquidModeBar(
+                    modes: model?.listenModes ?? [],
+                    selection: status.noiseControlMode
+                ) { bluetooth.setNoiseControl($0) }
+                strength
             }
-            tiles
-            equalizerModule
+            quickActions
         }
         .transition(.opacity.combined(with: .scale(scale: 0.97)))
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "earbuds")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.accentColor))
-                .shadow(color: Color.accentColor.opacity(0.4), radius: 8, y: 4)
+        HStack(spacing: 12) {
+            BudsArt(size: 44)
+                .frame(width: 58, height: 58)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: deviceName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 HStack(spacing: 6) {
-                    Circle().fill(Color.batteryGreen).frame(width: 7, height: 7)
-                        .background(Circle().fill(Color.batteryGreen.opacity(0.25)).frame(width: 13, height: 13))
-                    Text("Connected").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Circle().fill(Color.batteryGreen).frame(width: 6, height: 6)
+                        .shadow(color: Color.batteryGreen, radius: 4)
+                    Text("Connected").font(.system(size: 12)).foregroundStyle(.white.opacity(0.62))
                 }
             }
             Spacer(minLength: 0)
-            iconButton("gearshape", help: "Settings…") { openDetail(.overview) }
+            LiquidIconButton(icon: "ellipsis", help: "Settings…", size: 30) { openDetail(.overview) }
         }
-        .padding(.horizontal, 2)
     }
 
     /// Left, right and — when the model reports it — the case. The case only
-    /// reports while the buds sit in it, so it shows "—" the rest of the time.
+    /// reports while the buds sit in it, so it reads "—" the rest of the time.
     private var batteries: some View {
-        let showCase = model?.supportsCaseBattery == true
-        return HStack(spacing: 0) {
-            CircularBatteryGauge(
-                level: status.batteryLeft, label: "Left",
-                present: status.batteryLeft > 0, charging: status.isLeftCharging,
-                diameter: 44)
-                .frame(maxWidth: .infinity)
-            CircularBatteryGauge(
-                level: status.batteryRight, label: "Right",
-                present: status.batteryRight > 0, charging: status.isRightCharging,
-                diameter: 44)
-                .frame(maxWidth: .infinity)
-            if showCase {
-                CircularBatteryGauge(
-                    level: status.batteryCase, label: "Case",
-                    present: status.batteryCase > 0, diameter: 44, kind: .budsCase)
-                    .frame(maxWidth: .infinity)
+        HStack(spacing: 6) {
+            BatteryPill(label: "L", level: status.batteryLeft,
+                        present: status.batteryLeft > 0, charging: status.isLeftCharging)
+            BatteryPill(label: "R", level: status.batteryRight,
+                        present: status.batteryRight > 0, charging: status.isRightCharging)
+            if model?.supportsCaseBattery == true {
+                BatteryPill(label: "Case", level: status.batteryCase,
+                            present: status.batteryCase > 0)
             }
         }
-        .glassCard(padding: 10)
     }
 
-    /// Listen mode plus ANC strength. Strength only means anything while ANC is
-    /// the active mode, so it's dimmed — not hidden — to keep the panel from
-    /// resizing under the pointer.
-    private var listenModule: some View {
+    /// Strength only means anything while ANC is the active mode, so it's
+    /// dimmed — not hidden — to keep the panel from resizing under the pointer.
+    private var strength: some View {
         let ancActive = status.noiseControlMode == .anc
+        let count = model?.ancLevelCount ?? 2
+        let level = max(0, min(count - 1, status.ancLevel))
         return VStack(spacing: 8) {
-            GlassSectionHeader(title: "Listen mode",
-                               value: LocalizedStringKey(status.noiseControlMode.displayName))
-            ListenModePicker(
-                modes: model?.listenModes ?? [],
-                selection: status.noiseControlMode,
-                height: 42
-            ) { bluetooth.setNoiseControl($0) }
-
-            HStack(spacing: 12) {
-                Text("ANC strength")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                AncStrengthStepper(
-                    level: status.ancLevel,
-                    count: model?.ancLevelCount ?? 2,
-                    height: 18
-                ) { bluetooth.setAncLevel($0) }
+            HStack {
+                Text("Noise cancelling strength")
+                Spacer()
+                Text(verbatim: "\(level + 1) / \(count)").monospacedDigit()
             }
-            .padding(.horizontal, 2)
-            .disabled(!ancActive)
-            .opacity(ancActive ? 1 : 0.35)
-            .animation(.glass, value: ancActive)
+            .font(.system(size: 12))
+            .foregroundStyle(.white.opacity(0.62))
+            .padding(.horizontal, 4)
+
+            LiquidStrengthSlider(level: status.ancLevel, count: count) {
+                bluetooth.setAncLevel($0)
+            }
         }
-        .glassCard(padding: 10)
+        .disabled(!ancActive)
+        .opacity(ancActive ? 1 : 0.35)
+        .animation(.glass, value: ancActive)
     }
 
-    /// Control Center–style toggle tiles.
-    private var tiles: some View {
-        HStack(spacing: 8) {
+    private var quickActions: some View {
+        let presets: [EqualizerPreset] = model?.supportsCustomEqualizer == true
+            ? EqualizerPreset.allCases
+            : EqualizerPreset.allCases.filter { $0 != .custom }
+        let current = status.equalizerPreset
+        return HStack(spacing: 6) {
             if model?.supportsDetectConversations == true {
                 let on = status.detectConversations
-                tile(icon: "bubble.left.and.text.bubble.right",
-                     title: "Conversation",
-                     subtitle: on ? "Auto ambient on" : "Off",
-                     active: on) {
+                LiquidRoundButton(icon: "bubble.left.and.text.bubble.right",
+                                  title: Text("Conversation"), active: on) {
                     bluetooth.setDetectConversations(!on)
                 }
+                .help(Text(on ? "Auto switch to ambient sound: On" : "Auto switch to ambient sound: Off"))
             }
-            tile(icon: "bell.badge", title: "Find earbuds", subtitle: "Ring both", active: false) {
+            // Click cycles through the presets; right-click lists them all.
+            LiquidRoundButton(icon: "slider.vertical.3",
+                              title: Text(LocalizedStringKey(current.displayName))) {
+                let index = presets.firstIndex(of: current) ?? -1
+                bluetooth.setEqualizer(presets[(index + 1) % presets.count])
+            }
+            .contextMenu {
+                ForEach(presets) { preset in
+                    Button { bluetooth.setEqualizer(preset) } label: {
+                        Text(LocalizedStringKey(preset.displayName))
+                    }
+                }
+            }
+            .help("Equalizer — click for the next preset, right-click to choose")
+            LiquidRoundButton(icon: "bell.badge", title: Text("Find")) {
                 openDetail(.findEarbuds)
             }
         }
     }
 
-    private func tile(
-        icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey,
-        active: Bool, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 26, height: 26)
-                    .background(Circle().fill(active ? Color.white.opacity(0.22) : Color.glassTrack))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                    Text(subtitle).font(.system(size: 10)).opacity(0.75).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(active ? Color.white : Color.primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(active ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.glassCard))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.glassEdge, lineWidth: 0.5)
-            )
-            .animation(.glass, value: active)
-        }
-        .buttonStyle(.pressable)
-    }
-
-    private var equalizerModule: some View {
-        // Models with the full custom EQ expose .custom; older models only the
-        // fixed presets.
-        let supportsCustom = model?.supportsCustomEqualizer == true
-        let presets: [EqualizerPreset] = supportsCustom
-            ? EqualizerPreset.allCases
-            : EqualizerPreset.allCases.filter { $0 != .custom }
-        return VStack(spacing: 8) {
-            GlassSectionHeader(title: "Equalizer",
-                               value: LocalizedStringKey(status.equalizerPreset.displayName))
-            EqualizerPresetGrid(
-                presets: presets,
-                selection: status.equalizerPreset,
-                columns: 3, compact: true
-            ) { bluetooth.setEqualizer($0) }
-        }
-        .glassCard(padding: 10)
-    }
-
     // MARK: - Footer
 
     private var footer: some View {
-        HStack(spacing: 8) {
-            if bluetooth.isConnected {
-                Button { openDetail(.overview) } label: {
-                    Text("Galaxy Buds Settings…")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
-                        .glassCard(cornerRadius: 12, padding: 0)
+        VStack(spacing: 10) {
+            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+            HStack(spacing: 6) {
+                if bluetooth.isConnected {
+                    Button { openDetail(.overview) } label: {
+                        Text("Galaxy Buds Settings…")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .buttonStyle(.pressable)
                 }
-                .buttonStyle(.pressable)
-            } else {
                 Spacer()
+                if bluetooth.isConnected && !bluetooth.handedOffToPhone {
+                    LiquidIconButton(icon: "iphone", help: "Send audio to phone") {
+                        bluetooth.handOffToPhone()
+                    }
+                }
+                LiquidIconButton(icon: "power", help: "Quit") {
+                    NSApplication.shared.terminate(nil)
+                }
             }
-            if bluetooth.isConnected && !bluetooth.handedOffToPhone {
-                squareButton("iphone", help: "Send audio to phone") { bluetooth.handOffToPhone() }
-            }
-            squareButton("power", help: "Quit") { NSApplication.shared.terminate(nil) }
+            .padding(.horizontal, 4)
         }
-    }
-
-    private func squareButton(_ symbol: String, help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
-                .glassCard(cornerRadius: 12, padding: 0)
-        }
-        .buttonStyle(.pressable)
-        .help(help)
-        .accessibilityLabel(Text(help))
-    }
-
-    private func iconButton(_ symbol: String, help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.glassCard))
-        }
-        .buttonStyle(.pressable)
-        .help(help)
-        .accessibilityLabel(Text(help))
     }
 
     // MARK: - Other states
@@ -257,102 +186,57 @@ struct MenuPopoverView: View {
     private var handedOff: some View {
         VStack(spacing: 14) {
             Image(systemName: "iphone.radiowaves.left.and.right")
-                .font(.system(size: 32, weight: .medium))
+                .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(Color.accentColor)
                 .symbolEffect(.variableColor.iterative, options: .repeating)
             VStack(spacing: 3) {
-                Text(verbatim: deviceName).font(.system(size: 15, weight: .semibold))
-                Text("Audio on phone").font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: deviceName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Audio on phone").font(.system(size: 12)).foregroundStyle(.white.opacity(0.62))
             }
-            Button {
+            primaryButton(title: "Connect on Mac", icon: "laptopcomputer") {
                 bluetooth.reclaimFromPhone()
-            } label: {
-                Label("Connect on Mac", systemImage: "laptopcomputer")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .glassCard(padding: 16)
         .transition(.opacity)
     }
 
     private var disconnected: some View {
         VStack(spacing: 12) {
-            Image(systemName: "earbuds")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("No Buds Connected").font(.headline)
-            Text("Connect your Galaxy Buds to get started.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button { openDetail(.overview) } label: {
-                Text("Connect").frame(maxWidth: .infinity)
+            BudsArt(size: 64).opacity(0.6)
+            VStack(spacing: 3) {
+                Text("No Buds Connected")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Connect your Galaxy Buds to get started.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            primaryButton(title: "Connect", icon: nil) { openDetail(.overview) }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .glassCard(padding: 16)
         .transition(.opacity)
     }
-}
 
-/// Grid of equalizer preset chips. Shared by the panel and the window.
-struct EqualizerPresetGrid: View {
-    let presets: [EqualizerPreset]
-    let selection: EqualizerPreset
-    var columns: Int = 3
-    var compact: Bool = true
-    let onSelect: (EqualizerPreset) -> Void
-
-    var body: some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: compact ? 6 : 10), count: columns),
-            spacing: compact ? 6 : 10
-        ) {
-            ForEach(presets) { preset in
-                chip(preset)
+    private func primaryButton(title: LocalizedStringKey, icon: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let icon { Image(systemName: icon) }
+                Text(title)
             }
-        }
-        .animation(.glass, value: selection)
-    }
-
-    private func chip(_ preset: EqualizerPreset) -> some View {
-        let selected = preset == selection
-        return Button { onSelect(preset) } label: {
-            Group {
-                if compact {
-                    Text(LocalizedStringKey(preset.displayName))
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 26)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Image(systemName: preset.iconName)
-                            .font(.system(size: 14, weight: .semibold))
-                        Text(LocalizedStringKey(preset.displayName))
-                            .font(.system(size: 13, weight: .semibold))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                }
-            }
-            .foregroundStyle(selected ? Color.white : Color.primary)
-            .background(
-                RoundedRectangle(cornerRadius: compact ? 8 : 16, style: .continuous)
-                    .fill(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.glassTrack))
-                    .shadow(color: selected ? Color.accentColor.opacity(0.35) : .clear, radius: 6, y: 3)
-            )
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background(Capsule().fill(Color.accentColor.gradient))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5))
+            .shadow(color: Color.accentColor.opacity(0.4), radius: 8, y: 4)
         }
         .buttonStyle(.pressable)
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
