@@ -12,6 +12,7 @@ final class StatusBarController {
     private var detailWindow: NSWindow?
     private var outsideClickMonitor: Any?
     private let bluetooth: BluetoothManager
+    private let navigation = DetailNavigation()
 
     init(bluetooth: BluetoothManager) {
         self.bluetooth = bluetooth
@@ -92,8 +93,8 @@ final class StatusBarController {
 
     private func makePanel() -> NSPanel {
         let hosting = NSHostingController(
-            rootView: MenuPopoverView(bluetooth: bluetooth) { [weak self] in
-                self?.openDetailWindow()
+            rootView: MenuPopoverView(bluetooth: bluetooth) { [weak self] section in
+                self?.openDetailWindow(section: section)
             }
         )
         let panel = NSPanel(
@@ -105,6 +106,9 @@ final class StatusBarController {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
+        // Glass corners: let the SwiftUI vibrancy view draw the shape.
+        hosting.view.wantsLayer = true
+        hosting.view.layer?.backgroundColor = .clear
         panel.hidesOnDeactivate = false
         // Movable as a safety net: the panel normally drops straight under the
         // menu-bar icon, but when the icon isn't where it should be the panel
@@ -197,20 +201,26 @@ final class StatusBarController {
 
     // MARK: - Detail window
 
-    func openDetailWindow() {
+    func openDetailWindow(section: DashboardSection? = nil) {
         closePanel()
+        if let section { navigation.section = section }
         if detailWindow == nil {
-            let root = PopoverView(bluetooth: bluetooth)
-                .frame(width: 440, height: 600)
-                .background(Color(nsColor: .windowBackgroundColor))
+            let size = NSSize(width: 900, height: 640)
+            let root = PopoverView(bluetooth: bluetooth, navigation: navigation)
+                .frame(width: size.width, height: size.height)
             let hosting = NSHostingController(rootView: root)
             hosting.sizingOptions = []
             let win = NSWindow(contentViewController: hosting)
             win.title = "Galaxy Buds"
-            win.styleMask = [.titled, .closable, .miniaturizable]
+            // Full-size content under a transparent title bar, so the vibrant
+            // sidebar runs to the top edge with the traffic lights over it.
+            win.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+            win.titlebarAppearsTransparent = true
+            win.titleVisibility = .hidden
+            win.isOpaque = false
+            win.backgroundColor = .clear
             win.isReleasedWhenClosed = false
-            win.backgroundColor = .windowBackgroundColor
-            win.setContentSize(NSSize(width: 440, height: 600))
+            win.setContentSize(size)
             win.center()
             detailWindow = win
         }
