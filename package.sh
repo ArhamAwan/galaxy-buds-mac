@@ -57,7 +57,7 @@ rm -rf "$STAGE"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if [ -z "${SKIP_NOTARIZE:-}" ]; then
-  echo "==> Notarizing $DMG…"
+  echo "==> Notarizing ${DMG}…"
   xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
   xcrun stapler staple "$DMG"
   echo "==> Gatekeeper check:"
