@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Manual signing: the App Store Connect API key used for uploads has no
+	     cloud-signing permission, so the certificates and the "Budsy Mac App
+	     Store" profile come from the login keychain / installed profiles. -->
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>destination</key>
@@ -9,7 +12,16 @@
 	<key>teamID</key>
 	<string>79S4TUX86W</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>installerSigningCertificate</key>
+	<string>3rd Party Mac Developer Installer</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.nivorbit.budsy</key>
+		<string>Budsy Mac App Store</string>
+	</dict>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>manageAppVersionAndBuildNumber</key>
