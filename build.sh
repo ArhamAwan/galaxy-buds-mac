@@ -29,8 +29,9 @@ swiftc -parse-as-library \
   Sources/Bluetooth/MessageId.swift \
   Sources/Bluetooth/SppMessage.swift \
   Sources/Bluetooth/BluetoothManager.swift \
+  Sources/App/PreviewRenderer.swift \
   Sources/Views/BudsModelUI.swift \
-  Sources/Views/CircularBatteryGauge.swift \
+  Sources/Views/GlassKit.swift \
   Sources/Views/AncStrengthStepper.swift \
   Sources/Views/ListenModePicker.swift \
   Sources/Views/MenuPopoverView.swift \

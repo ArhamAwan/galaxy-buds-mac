@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Dedicated equalizer page. A preset chooser (Normal/Bass Boost/.../Custom)
-/// drives a 9-band vertical-bar graph. Presets show the device-reported curve
-/// (read-only); Custom is fully draggable. Custom curves persist across
-/// reconnects/restarts via UserDefaults.
+/// Dedicated equalizer page, drawn straight on the panel's glass like the
+/// dashboard: a Preset section with the chooser (Normal/Bass Boost/.../Custom)
+/// in its row, a hairline, then the 9-band vertical-bar graph. Presets show
+/// the device-reported curve (read-only); Custom is fully draggable. Custom
+/// curves persist across reconnects/restarts via UserDefaults.
 struct EqualizerView: View {
     @Bindable var bluetooth: BluetoothManager
     let onBack: () -> Void
 
     private var status: BudsStatus { bluetooth.status }
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
 
     private let frequencies = ["63", "125", "250", "500", "1k",
                                "2k", "4k", "8k", "16k"]
@@ -37,43 +38,20 @@ struct EqualizerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(spacing: 18) {
-                    presetSection
-                    graphSection
-                }
-                .padding(18)
-            }
+        DetailPage(title: "Equalizer", onBack: onBack) {
+            presetSection
+            GlassDivider()
+            graphSection
         }
-        .frame(width: 440, height: 560)
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button(action: onBack) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundStyle(tint)
-            }
-            .buttonStyle(.plain)
-            Spacer()
-            Text("Equalizer").font(.system(size: 15, weight: .semibold))
-            Spacer()
-            Color.clear.frame(width: 44, height: 1)
-        }
-        .padding(14)
     }
 
     // MARK: - Preset
 
+    /// Seven presets with labels as long as "Treble Boost" don't fit a pill
+    /// across the panel, so the chooser stays a menu at the row's trailing edge.
     private var presetSection: some View {
-        section("Preset") {
-            row("Mode") {
+        GlassSection(title: "Preset") {
+            GlassRow(title: "Mode") {
                 Menu {
                     ForEach(EqualizerPreset.allCases) { preset in
                         Button { bluetooth.setEqualizer(preset) } label: {
@@ -85,6 +63,7 @@ struct EqualizerView: View {
                         Text(LocalizedStringKey(status.equalizerPreset.displayName))
                         Image(systemName: "chevron.up.chevron.down").font(.system(size: 11))
                     }
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
@@ -94,38 +73,29 @@ struct EqualizerView: View {
 
     // MARK: - Graph
 
+    /// The bars sit directly on the glass; under them either the reset
+    /// capsule (Custom, once any band is off flat) or the read-only note.
+    @ViewBuilder
     private var graphSection: some View {
-        VStack(spacing: 14) {
-            HStack(alignment: .bottom, spacing: 0) {
-                ForEach(0..<9, id: \.self) { i in
-                    eqBar(for: i)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 230)
-            .padding(.horizontal, 4)
-
-            HStack(spacing: 16) {
-                if isCustom && displayBands.contains(where: { $0 != 0 }) {
-                    Button {
-                        bluetooth.setCustomEqualizer(bands: Array(repeating: 0, count: 9))
-                    } label: {
-                        Text("Reset to flat")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(tint)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if !isCustom {
-                    Text("Preset curve (read-only)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
+        HStack(alignment: .bottom, spacing: 0) {
+            ForEach(0..<9, id: \.self) { i in
+                eqBar(for: i)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12)
-            .fill(Color(nsColor: .controlBackgroundColor)))
+        .frame(height: 230)
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+
+        if isCustom && displayBands.contains(where: { $0 != 0 }) {
+            GlassActionButton(title: "Reset to flat", tint: tint, prominent: false) {
+                bluetooth.setCustomEqualizer(bands: Array(repeating: 0, count: 9))
+            }
+        }
+        if !isCustom {
+            GlassFootnote(text: "Preset curve (read-only)")
+        }
     }
 
     /// A single vertical bar. The fill height encodes the band gain, clamped to
@@ -205,35 +175,5 @@ struct EqualizerView: View {
                 .frame(height: max(2, height))
                 .offset(y: height / 2)
         }
-    }
-
-    // MARK: - Building blocks
-
-    private func section<Content: View>(
-        _ title: LocalizedStringKey, @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 4)
-            VStack(spacing: 0) { content() }
-                .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
-        }
-    }
-
-    private func row<Trailing: View>(
-        _ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            trailing()
-        }
-        .padding(.vertical, 10)
     }
 }

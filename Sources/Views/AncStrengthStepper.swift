@@ -6,7 +6,7 @@ import SwiftUI
 struct AncStrengthStepper: View {
     let level: Int
     let count: Int
-    var tint: Color = .blue
+    var tint: Color = .accentColor
     let onChange: (Int) -> Void
 
     private var clamped: Int { max(0, min(count - 1, level)) }
@@ -51,12 +51,15 @@ struct AncStrengthStepper: View {
                     Button { onChange(step) } label: {
                         ZStack {
                             if step == clamped {
+                                // A solid knob reads on any backdrop; a ring
+                                // filled with the window colour showed black
+                                // on the dark-mode glass tile.
                                 Circle()
-                                    .fill(Color(nsColor: .windowBackgroundColor))
+                                    .fill(tint)
                                     .frame(width: 18, height: 18)
                                 Circle()
-                                    .strokeBorder(tint, lineWidth: 2.5)
-                                    .frame(width: 18, height: 18)
+                                    .fill(Color.white)
+                                    .frame(width: 6, height: 6)
                             } else {
                                 Circle()
                                     .fill(Color.secondary.opacity(0.45))

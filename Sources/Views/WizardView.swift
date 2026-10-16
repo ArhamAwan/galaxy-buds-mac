@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// The connect flow shown in the panel while no buds are connected: welcome,
+/// model selection, scanning for devices, then the connection result. It is
+/// drawn with the same kit as the dashboard's sub-pages — rows straight on
+/// the glass, hairlines between blocks, capsule actions — so the panel reads
+/// the same before and after a device is connected. It has no parent page, so
+/// it keeps the panel's fixed size itself instead of going through
+/// `DetailPage`.
 struct WizardView: View {
     @Bindable var bluetooth: BluetoothManager
     let onComplete: () -> Void
@@ -15,11 +22,15 @@ struct WizardView: View {
         case connecting
     }
 
+    /// Nothing is connected yet, so the candidate model's colour stands in
+    /// for the device tint the dashboard uses.
+    private var tint: Color { .accentColor }
+
     var body: some View {
         VStack(spacing: 0) {
             stepIndicator
 
-            Divider()
+            GlassDivider()
 
             Group {
                 switch step {
@@ -35,58 +46,51 @@ struct WizardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 440, height: 560)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+        .frame(width: DetailLayout.width, height: DetailLayout.height)
     }
 
     // MARK: - Step Indicator
 
     private var stepIndicator: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             ForEach(WizardStep.allCases, id: \.rawValue) { s in
                 Circle()
-                    .fill(s.rawValue <= step.rawValue ? Color.accentColor : Color.secondary.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                    .fill(s.rawValue <= step.rawValue ? tint : Color.primary.opacity(0.15))
+                    .frame(width: 6, height: 6)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Welcome
 
     private var welcomeStep: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             Spacer()
 
-            Image(systemName: "airpodspro")
-                .font(.system(size: 64))
-                .foregroundStyle(.blue)
-                .symbolRenderingMode(.hierarchical)
+            heroGlyph("airpodspro", color: tint)
 
             Text("Welcome to BudsApp")
-                .font(.title.bold())
+                .font(.system(size: 15, weight: .semibold))
 
             Text("Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more.")
-                .multilineTextAlignment(.center)
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
-                .font(.body)
+                .multilineTextAlignment(.center)
 
             Spacer()
 
-            Button(action: { step = .selectModel }) {
-                Text("Get Started")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
-            .padding(.bottom, 24)
+            GlassActionButton(title: "Get Started", tint: tint) { step = .selectModel }
         }
     }
 
     // MARK: - Select Model
 
-    /// The flagship/newest models shown as featured cards; everything else
-    /// lives in the dropdown below (newest first).
+    /// The flagship/newest models shown as rows; everything else lives in the
+    /// menu below (newest first).
     private var featuredModels: [BudsModel] {
         [.buds4Pro, .buds4, .buds3Pro, .buds3]
     }
@@ -96,153 +100,135 @@ struct WizardView: View {
     }
 
     private var selectModelStep: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text("Select Your Model")
-                    .font(.title2.bold())
+                    .font(.system(size: 15, weight: .semibold))
                 Text("Pick your Galaxy Buds")
-                    .font(.subheadline)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
-            .padding(.top, 22)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12),
-            ], spacing: 12) {
-                ForEach(featuredModels) { model in
-                    modelCard(model)
+            GlassDivider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(featuredModels) { model in
+                        modelRow(model)
+                    }
+                    otherModelsRow
                 }
             }
-            .padding(.horizontal, 24)
-
-            // Native dropdown for the remaining models — keeps the picker
-            // compact instead of a long scroll. A Menu (not Picker) lets us show
-            // a placeholder when the current selection is a featured model.
-            HStack(spacing: 8) {
-                Text("Other models")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Menu {
-                    ForEach(olderModels) { model in
-                        Button(model.rawValue) { selectedModel = model }
-                    }
-                } label: {
-                    // Separate branches so the placeholder localizes (a String
-                    // in a ternary uses Text's non-localizing initializer) while
-                    // the model name stays verbatim.
-                    Group {
-                        if olderModels.contains(selectedModel) {
-                            Text(verbatim: selectedModel.rawValue)
-                        } else {
-                            Text("Choose a model…")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(olderModels.contains(selectedModel)
-                                     ? .primary : .secondary)
-                }
-                .menuStyle(.borderlessButton)
-                .frame(maxWidth: 190)
-            }
-            .padding(.horizontal, 24)
 
             Spacer(minLength: 0)
 
-            VStack(spacing: 6) {
-                Text("Selected: \(selectedModel.rawValue)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button(action: {
-                    step = .scanning
-                    bluetooth.startScanning()
-                }) {
-                    Text("Next")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+            GlassFootnote(text: "Selected: \(selectedModel.rawValue)")
+            GlassActionButton(title: "Next", tint: tint) {
+                step = .scanning
+                bluetooth.startScanning()
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 24)
         }
     }
 
-    private func modelCard(_ model: BudsModel) -> some View {
+    /// A selectable row with the model's coloured glyph, its year and
+    /// capability badge, and a tick on the current choice.
+    private func modelRow(_ model: BudsModel) -> some View {
         let isSelected = selectedModel == model
         return Button(action: { selectedModel = model }) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(model.tint.opacity(isSelected ? 0.24 : 0.14))
-                        .frame(width: 52, height: 52)
-                    Image(systemName: model.iconName)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(model.tint)
-                }
-
-                Text(model.rawValue)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .foregroundStyle(.primary)
-
-                HStack(spacing: 4) {
-                    Text(model.releaseYear)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    if let badge = model.capabilityBadge {
-                        Text(badge)
-                            .font(.system(size: 9, weight: .semibold))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(
-                                Capsule().fill(model.tint.opacity(0.18))
-                            )
-                            .foregroundStyle(model.tint)
+            HStack(spacing: 10) {
+                GlassGlyph(symbol: model.iconName, color: model.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: model.rawValue)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text(verbatim: model.releaseYear)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        if let badge = model.capabilityBadge {
+                            Text(verbatim: badge)
+                                .font(.system(size: 9, weight: .semibold))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(model.tint.opacity(0.18)))
+                                .foregroundStyle(model.tint)
+                        }
                     }
                 }
+                Spacer(minLength: 8)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(tint)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? model.tint.opacity(0.10) : Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? model.tint : Color.secondary.opacity(0.18),
-                            lineWidth: isSelected ? 2 : 1)
-            )
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassRowButtonStyle())
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Native menu for the remaining models at the row's trailing edge —
+    /// keeps the picker compact instead of a long scroll. A Menu (not Picker)
+    /// lets us show a placeholder when the current selection is a featured
+    /// model.
+    private var otherModelsRow: some View {
+        GlassRow(title: "Other models") {
+            Menu {
+                ForEach(olderModels) { model in
+                    Button(model.rawValue) { selectedModel = model }
+                }
+            } label: {
+                // Separate branches so the placeholder localizes (a String
+                // in a ternary uses Text's non-localizing initializer) while
+                // the model name stays verbatim.
+                HStack(spacing: 4) {
+                    if olderModels.contains(selectedModel) {
+                        Text(verbatim: selectedModel.rawValue)
+                    } else {
+                        Text("Choose a model…")
+                    }
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10))
+                }
+                .font(.system(size: 13))
+                .foregroundStyle(olderModels.contains(selectedModel) ? .primary : .secondary)
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        }
     }
 
     // MARK: - Scanning
 
     private var scanningStep: some View {
-        VStack(spacing: 16) {
-            Text("Looking for Galaxy Buds...")
-                .font(.title2.bold())
-                .padding(.top, 20)
-
-            if bluetooth.isScanning {
-                ProgressView()
-                    .controlSize(.large)
-                    .padding()
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Button {
+                    bluetooth.stopScanning()
+                    step = .selectModel
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(GlassRowButtonStyle())
+                .accessibilityLabel(Text("Back"))
+                Text("Looking for Galaxy Buds...")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer(minLength: 0)
+                if bluetooth.isScanning {
+                    ProgressView().controlSize(.small)
+                }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+
+            GlassDivider()
 
             if let error = bluetooth.connectionError {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.orange)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding()
+                resultRow(icon: "exclamationmark.triangle.fill", color: .orange, text: Text(error))
             }
 
             if bluetooth.discoveredDevices.isEmpty && !bluetooth.isScanning
@@ -252,22 +238,23 @@ struct WizardView: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.secondary)
                     Text("No devices found")
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                     Text("Make sure your buds are in pairing mode\nor already paired with this Mac.")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
                 }
-                .padding()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
             }
 
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(bluetooth.discoveredDevices) { device in
                         deviceRow(device)
                     }
                 }
-                .padding(.horizontal, 20)
             }
             .onChange(of: bluetooth.discoveredDevices.count) { _, _ in
                 // Auto-select the model inferred from the first discovered
@@ -278,24 +265,11 @@ struct WizardView: View {
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            HStack {
-                Button("Rescan") {
-                    bluetooth.startScanning()
-                }
-                .controlSize(.large)
-
-                Spacer()
-
-                Button("Back") {
-                    bluetooth.stopScanning()
-                    step = .selectModel
-                }
-                .controlSize(.large)
+            GlassActionButton(title: "Rescan", tint: tint) {
+                bluetooth.startScanning()
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 24)
         }
     }
 
@@ -309,93 +283,94 @@ struct WizardView: View {
             step = .connecting
             bluetooth.connect(to: device, model: model)
         }) {
-            HStack {
-                ZStack {
-                    Circle()
-                        .fill(model.tint.opacity(0.16))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: model.iconName)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(model.tint)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(device.name)
-                        .font(.body.bold())
-                    Text(model.rawValue)
-                        .font(.caption)
+            HStack(spacing: 10) {
+                GlassGlyph(symbol: model.iconName, color: model.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: device.name)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary)
+                    Text(verbatim: model.rawValue)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer()
-
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.secondary.opacity(0.08))
-            )
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassRowButtonStyle())
     }
 
     // MARK: - Connecting
 
     private var connectingStep: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             Spacer()
 
             if bluetooth.isConnected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.green)
-                    .symbolRenderingMode(.multicolor)
+                heroGlyph("checkmark", color: .green)
 
                 Text("Connected!")
-                    .font(.title.bold())
+                    .font(.system(size: 15, weight: .semibold))
 
                 Text("Your \(selectedModel.rawValue) is ready.")
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
-                Button(action: onComplete) {
-                    Text("Done")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.horizontal, 40)
+                GlassActionButton(title: "Done", tint: tint, action: onComplete)
             } else if let error = bluetooth.connectionError {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.red)
+                heroGlyph("exclamationmark", color: .red)
 
                 Text("Connection Failed")
-                    .font(.title.bold())
+                    .font(.system(size: 15, weight: .semibold))
 
                 Text(error)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
 
-                Button("Try Again") {
+                GlassActionButton(title: "Try Again", tint: tint) {
                     step = .scanning
                     bluetooth.startScanning()
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.horizontal, 40)
             } else {
                 ProgressView()
                     .controlSize(.large)
 
                 Text("Connecting to \(selectedDevice?.name ?? "device")...")
-                    .font(.title3)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
         }
+    }
+
+    // MARK: - Building blocks
+
+    /// The dashboard header's device disc at hero size, for the steps that
+    /// centre one symbol above their title.
+    private func heroGlyph(_ symbol: String, color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 26, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 56, height: 56)
+            .background(Circle().fill(color))
+    }
+
+    /// Takes a `Text` so the runtime error string from the manager can be
+    /// shown without going through the string catalogue.
+    private func resultRow(icon: String, color: Color, text: Text) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon).foregroundStyle(color)
+            text.font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }

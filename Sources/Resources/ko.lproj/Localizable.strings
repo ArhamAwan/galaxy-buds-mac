@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "이어버드가 펌웨어를 확인하지 못했습니다.";
 "The update failed." = "업데이트에 실패했습니다.";
 "The earbuds disconnected." = "이어버드 연결이 끊겼습니다.";
+
+// Panel sections
+"Listening Mode" = "청취 모드";
+"On" = "켬";
+"Noise Cancelling" = "노이즈 캔슬링";
+"Ambient Sound" = "주변 소리";

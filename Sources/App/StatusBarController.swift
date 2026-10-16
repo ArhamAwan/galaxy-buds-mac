@@ -1,15 +1,24 @@
 import AppKit
 import SwiftUI
 
-/// Owns the menu-bar status item, the compact quick panel, and the detail
-/// window. Clicking the menu-bar icon toggles a borderless panel that drops
-/// straight down from the icon (no popover arrow, like the native AirPods
-/// menu); the panel's "Settings…" button opens the detail window.
+/// Owns the menu-bar status item and the panel under it. Clicking the icon
+/// toggles a borderless panel that drops straight down from it (no popover
+/// arrow, like the native AirPods menu). The panel opens on the compact quick
+/// view; "Settings…" swaps the same panel to the full dashboard rather than
+/// opening a separate window, so everything stays anchored to the icon.
+/// Closing the panel returns it to the quick view for next time.
 @MainActor
 final class StatusBarController {
+    /// Which of the two views the panel is showing. Observable so the hosted
+    /// SwiftUI root re-renders when "Settings…" flips it.
+    @Observable
+    final class PanelState {
+        var showsDetail = false
+    }
+
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
-    private var detailWindow: NSWindow?
+    private let panelState = PanelState()
     private var outsideClickMonitor: Any?
     private let bluetooth: BluetoothManager
 
@@ -92,11 +101,11 @@ final class StatusBarController {
 
     private func makePanel() -> NSPanel {
         let hosting = NSHostingController(
-            rootView: MenuPopoverView(bluetooth: bluetooth) { [weak self] in
+            rootView: PanelRootView(bluetooth: bluetooth, state: panelState) { [weak self] in
                 self?.openDetailWindow()
             }
         )
-        let panel = NSPanel(
+        let panel = KeyablePanel(
             contentViewController: hosting
         )
         panel.styleMask = [.borderless, .nonactivatingPanel]
@@ -110,6 +119,19 @@ final class StatusBarController {
         // menu-bar icon, but when the icon isn't where it should be the panel
         // has to stay reachable rather than stranded.
         panel.isMovableByWindowBackground = true
+        // The hosted SwiftUI content resizes the window whenever it changes —
+        // quick view to dashboard, dashboard to a sub-page — and AppKit grows a
+        // window from its bottom-left corner, which pushes the top up under the
+        // menu bar. Re-anchor under the icon after every resize.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: panel, queue: .main
+        ) { [weak self, weak panel] _ in
+            MainActor.assumeIsolated {
+                guard let self, let panel, panel.isVisible else { return }
+                DiagnosticsLog.shared.log("panel: resized to \(NSStringFromSize(panel.frame.size))")
+                self.anchorPanel(panel)
+            }
+        }
         return panel
     }
 
@@ -120,7 +142,11 @@ final class StatusBarController {
         let panel = panel ?? makePanel()
         self.panel = panel
         positionPanel(panel)
-        panel.orderFront(nil)
+        // Key, not merely in front: controls in a window that isn't key draw
+        // in their inactive look, so every switch stayed grey when on. A
+        // non-activating panel can take key status without bringing the app
+        // forward, the way Spotlight and Control Center do.
+        panel.makeKeyAndOrderFront(nil)
         installOutsideClickMonitor()
     }
 
@@ -139,20 +165,30 @@ final class StatusBarController {
         panel.layoutIfNeeded()
         let size = panel.contentView?.fittingSize ?? NSSize(width: 300, height: 360)
         panel.setContentSize(size)
+        anchorPanel(panel)
+    }
 
+    /// Moves the panel (at its current size) to sit under the menu-bar icon,
+    /// clamped to the visible screen.
+    private func anchorPanel(_ panel: NSPanel) {
+        let size = panel.frame.size
         let screen = statusItem?.button?.window?.screen ?? NSScreen.main
         let frame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 
         var origin: NSPoint
         if let anchor = statusItemAnchor() {
-            origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 4)
+            origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 2)
         } else {
             // No usable status button — fall back to top-centre of the screen.
             origin = NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 8)
         }
         origin.x = min(max(frame.minX + 8, origin.x), frame.maxX - size.width - 8)
-        origin.y = min(max(frame.minY + 8, origin.y), frame.maxY - size.height - 8)
+        // 2pt below the menu bar, where the system's own Bluetooth and Sound
+        // panels sit.
+        origin.y = min(max(frame.minY + 8, origin.y), frame.maxY - size.height - 2)
         panel.setFrameOrigin(origin)
+        DiagnosticsLog.shared.log(
+            "panel: anchored at \(NSStringFromRect(panel.frame)), gap below menu bar \(Int(frame.maxY - panel.frame.maxY))pt")
     }
 
     /// The status button's rect on screen, but only when it is genuinely sitting
@@ -177,6 +213,8 @@ final class StatusBarController {
     private func closePanel() {
         panel?.orderOut(nil)
         removeOutsideClickMonitor()
+        // Next open starts on the quick view again, like Control Center.
+        panelState.showsDetail = false
     }
 
     private func installOutsideClickMonitor() {
@@ -195,27 +233,14 @@ final class StatusBarController {
         }
     }
 
-    // MARK: - Detail window
+    // MARK: - Detail view
 
+    /// Expands the panel in place to the full dashboard. The content resizes
+    /// on the next layout pass, and a window grows from its bottom-left
+    /// corner, so the panel is re-anchored under the icon once that happens.
     func openDetailWindow() {
-        closePanel()
-        if detailWindow == nil {
-            let root = PopoverView(bluetooth: bluetooth)
-                .frame(width: 440, height: 600)
-                .background(Color(nsColor: .windowBackgroundColor))
-            let hosting = NSHostingController(rootView: root)
-            hosting.sizingOptions = []
-            let win = NSWindow(contentViewController: hosting)
-            win.title = "Galaxy Buds"
-            win.styleMask = [.titled, .closable, .miniaturizable]
-            win.isReleasedWhenClosed = false
-            win.backgroundColor = .windowBackgroundColor
-            win.setContentSize(NSSize(width: 440, height: 600))
-            win.center()
-            detailWindow = win
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        detailWindow?.makeKeyAndOrderFront(nil)
+        DiagnosticsLog.shared.log("panel: switching to dashboard (visible=\(panel?.isVisible ?? false))")
+        panelState.showsDetail = true
     }
 
     func updateIcon(connected: Bool, batteryLeft: Int, batteryRight: Int) {
@@ -234,6 +259,32 @@ final class StatusBarController {
     deinit {
         if let monitor = outsideClickMonitor {
             NSEvent.removeMonitor(monitor)
+        }
+    }
+}
+
+/// A borderless panel that may become key. `NSPanel` refuses key status to a
+/// borderless window by default, which left the panel's controls drawing in
+/// their inactive state.
+private final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
+/// Root of the menu-bar panel: the compact quick view, or the full dashboard
+/// in its place. The dashboard gets the same backdrop and corner radius the
+/// quick view draws for itself, since the panel window behind both is clear.
+private struct PanelRootView: View {
+    @Bindable var bluetooth: BluetoothManager
+    var state: StatusBarController.PanelState
+    let openDetail: () -> Void
+
+    var body: some View {
+        if state.showsDetail {
+            PopoverView(bluetooth: bluetooth)
+                .frame(width: DetailLayout.width)
+                .modifier(PanelChrome())
+        } else {
+            MenuPopoverView(bluetooth: bluetooth, openDetail: openDetail)
         }
     }
 }

@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "Наушникам не удалось проверить прошивку.";
 "The update failed." = "Обновление не удалось.";
 "The earbuds disconnected." = "Наушники отключились.";
+
+// Panel sections
+"Listening Mode" = "Режим прослушивания";
+"On" = "Вкл.";
+"Noise Cancelling" = "Шумоподавление";
+"Ambient Sound" = "Окружающие звуки";

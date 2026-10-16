@@ -1,201 +1,119 @@
 import SwiftUI
 
-/// Detailed Sound & ANC settings, presented as a System Settings-style grouped
-/// list pushed in from the dashboard. Gated controls only appear for models
-/// that support them.
+/// Detailed Sound & ANC settings, pushed in from the dashboard and drawn in
+/// the same language: titled sections of rows straight on the panel's glass,
+/// hairlines between them. Gated controls only appear for models that
+/// support them.
 struct SoundAncView: View {
     @Bindable var bluetooth: BluetoothManager
     let onBack: () -> Void
 
     private var status: BudsStatus { bluetooth.status }
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(spacing: 18) {
-                    noiseSection
-                    ambientSection
-                    if bluetooth.connectedModel?.supportsDetectConversations == true {
-                        conversationsSection
-                    }
-                    callsSection
-                }
-                .padding(18)
+        DetailPage(title: "Sound & ANC", onBack: onBack) {
+            noiseSection
+            GlassDivider()
+            ambientSection
+            if bluetooth.connectedModel?.supportsDetectConversations == true {
+                GlassDivider()
+                conversationsSection
             }
+            GlassDivider()
+            callsSection
         }
-        .frame(width: 440, height: 560)
-    }
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button(action: onBack) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundStyle(tint)
-            }
-            .buttonStyle(.plain)
-            Spacer()
-            Text("Sound & ANC")
-                .font(.system(size: 15, weight: .semibold))
-            Spacer()
-            // Balances the back button so the title stays centered.
-            Color.clear.frame(width: 44, height: 1)
-        }
-        .padding(14)
     }
 
     // MARK: - Sections
 
     private var noiseSection: some View {
-        section("Noise cancelling") {
+        GlassSection(title: "Noise cancelling") {
             // Strength only applies while ANC is the active mode; adaptive
             // chooses its own. Dimmed to match the panel and the dashboard.
             let ancActive = status.noiseControlMode == .anc
             if bluetooth.connectedModel?.supportsAncStrength == true {
-                row("ANC strength") {
+                GlassRow(title: "ANC strength") {
                     AncStrengthStepper(
                         level: status.ancLevel,
                         count: bluetooth.connectedModel?.ancLevelCount ?? 2,
                         tint: tint
                     ) { bluetooth.setAncLevel($0) }
-                    .frame(width: 150)
+                    .frame(width: 200)
                 }
                 .disabled(!ancActive)
-                .opacity(ancActive ? 1 : 0.4)
-                Divider()
+                .opacity(ancActive ? 1 : 0.45)
             }
-            toggleRow("Noise control with one earbud",
-                      isOn: status.ncWithOneEarbud) { bluetooth.setNoiseControlWithOneEarbud($0) }
+            GlassToggleRow(title: "Noise control with one earbud",
+                           isOn: status.ncWithOneEarbud) { bluetooth.setNoiseControlWithOneEarbud($0) }
         }
     }
 
     private var ambientSection: some View {
-        section("Ambient sound") {
-            row("Ambient volume") {
+        GlassSection(title: "Ambient sound") {
+            GlassRow(title: "Ambient volume") {
                 volumeSlider(value: status.ambientSoundVolume) { bluetooth.setAmbientVolume($0) }
             }
-            Divider()
-            toggleRow("Customize ambient sound",
-                      isOn: status.ambientCustomEnabled) {
+            GlassToggleRow(title: "Customize ambient sound",
+                           isOn: status.ambientCustomEnabled) {
                 bluetooth.setCustomAmbient(enabled: $0, left: status.ambientCustomLeft,
                                            right: status.ambientCustomRight, tone: status.ambientTone)
             }
             if status.ambientCustomEnabled {
-                Divider()
-                row("Left") {
+                GlassRow(title: "Left") {
                     volumeSlider(value: status.ambientCustomLeft) {
                         bluetooth.setCustomAmbient(enabled: true, left: $0,
                                                    right: status.ambientCustomRight, tone: status.ambientTone)
                     }
                 }
-                Divider()
-                row("Right") {
+                GlassRow(title: "Right") {
                     volumeSlider(value: status.ambientCustomRight) {
                         bluetooth.setCustomAmbient(enabled: true, left: status.ambientCustomLeft,
                                                    right: $0, tone: status.ambientTone)
                     }
                 }
-                Divider()
-                row("Tone") {
-                    Picker("", selection: Binding(
-                        get: { status.ambientTone },
-                        set: { bluetooth.setCustomAmbient(enabled: true, left: status.ambientCustomLeft,
-                                                          right: status.ambientCustomRight, tone: $0) }
-                    )) {
-                        Text("Low").tag(0)
-                        Text("Mid").tag(1)
-                        Text("High").tag(2)
+                GlassRow(title: "Tone") {
+                    GlassSegmented(
+                        options: [(value: 0, label: "Low"), (value: 1, label: "Mid"), (value: 2, label: "High")],
+                        selection: status.ambientTone,
+                        tint: tint
+                    ) {
+                        bluetooth.setCustomAmbient(enabled: true, left: status.ambientCustomLeft,
+                                                   right: status.ambientCustomRight, tone: $0)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    .frame(width: 200)
                 }
             }
         }
     }
 
     private var conversationsSection: some View {
-        section("Conversations") {
-            toggleRow("Detect conversations",
-                      isOn: status.detectConversations) { bluetooth.setDetectConversations($0) }
+        GlassSection(title: "Conversations") {
+            GlassToggleRow(title: "Detect conversations",
+                           isOn: status.detectConversations) { bluetooth.setDetectConversations($0) }
             if status.detectConversations {
-                Divider()
-                row("Duration") {
-                    Picker("", selection: Binding(
-                        get: { status.detectConversationsDuration },
-                        set: { bluetooth.setDetectConversationsDuration($0) }
-                    )) {
-                        Text("5s").tag(0)
-                        Text("10s").tag(1)
-                        Text("15s").tag(2)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                GlassRow(title: "Duration") {
+                    GlassSegmented(
+                        options: [(value: 0, label: "5s"), (value: 1, label: "10s"), (value: 2, label: "15s")],
+                        selection: status.detectConversationsDuration,
+                        tint: tint
+                    ) { bluetooth.setDetectConversationsDuration($0) }
+                    .frame(width: 200)
                 }
             }
         }
     }
 
     private var callsSection: some View {
-        section("Calls") {
-            toggleRow("Sidetone (own voice)",
-                      isOn: status.sidetone) { bluetooth.setSidetone($0) }
-            Divider()
-            toggleRow("Ambient sound during calls",
-                      isOn: status.ambientDuringCalls) { bluetooth.setAmbientDuringCalls($0) }
+        GlassSection(title: "Calls") {
+            GlassToggleRow(title: "Sidetone (own voice)",
+                           isOn: status.sidetone) { bluetooth.setSidetone($0) }
+            GlassToggleRow(title: "Ambient sound during calls",
+                           isOn: status.ambientDuringCalls) { bluetooth.setAmbientDuringCalls($0) }
         }
     }
 
     // MARK: - Building blocks
-
-    private func section<Content: View>(
-        _ title: LocalizedStringKey,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 4)
-            VStack(spacing: 0) { content() }
-                .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
-        }
-    }
-
-    private func row<Trailing: View>(
-        _ title: LocalizedStringKey,
-        @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            trailing()
-        }
-        .padding(.vertical, 10)
-    }
-
-    private func toggleRow(
-        _ title: LocalizedStringKey,
-        isOn: Bool,
-        action: @escaping (Bool) -> Void
-    ) -> some View {
-        row(title) {
-            Toggle("", isOn: Binding(get: { isOn }, set: action))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-        }
-    }
 
     /// A 3-stop (0...2) volume slider.
     private func volumeSlider(value: Int, action: @escaping (Int) -> Void) -> some View {
@@ -203,6 +121,6 @@ struct SoundAncView: View {
             value: Binding(get: { Double(value) }, set: { action(Int($0.rounded())) }),
             in: 0...2, step: 1
         )
-        .frame(width: 140)
+        .frame(width: 180)
     }
 }

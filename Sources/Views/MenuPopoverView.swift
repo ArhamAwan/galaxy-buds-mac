@@ -1,17 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// The compact popover shown from the menu-bar icon — an AirPods-in-Control-
-/// Center style quick view. Detailed controls live behind the "Settings…"
-/// button, which opens the detail window.
+/// The panel shown from the menu-bar icon, in the shape of Control Center's
+/// Sound panel when AirPods are connected: the device with its battery line,
+/// then titled sections of menu-style rows with a checkmark on the current
+/// choice, and the "Settings…" row at the bottom that swaps the panel to the
+/// full dashboard.
 struct MenuPopoverView: View {
     @Bindable var bluetooth: BluetoothManager
     let openDetail: () -> Void
 
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
+    private var status: BudsStatus { bluetooth.status }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
             if bluetooth.isConnected {
                 connected
             } else if bluetooth.handedOffToPhone {
@@ -21,99 +24,74 @@ struct MenuPopoverView: View {
             }
             footer
         }
-        .padding(18)
-        .frame(width: 300)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 8)
+        .frame(width: 320)
+        .modifier(PanelChrome())
         .focusEffectDisabled() // no focus ring on the auto-focused default button
     }
 
+    // MARK: - Connected
+
+    @ViewBuilder
     private var connected: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 9) {
-                Image(systemName: "airpodspro")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(tint)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: bluetooth.connectedName
-                         ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
-                        .font(.system(size: 15, weight: .semibold))
-                    HStack(spacing: 5) {
-                        Circle().fill(.green).frame(width: 6, height: 6)
-                        Text("Connected").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
+        let model = bluetooth.connectedModel
+        HStack(spacing: 10) {
+            Image(systemName: "airpodspro")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(tint))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: bluetooth.connectedName ?? model?.rawValue ?? "Galaxy Buds")
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                BatteryGlyphLine(status: status, showsCase: model?.supportsCaseBattery == true)
             }
-
-            batteries
-
-            if bluetooth.connectedModel?.supportsANC == true {
-                listenMode
-                if bluetooth.connectedModel?.supportsAncStrength == true {
-                    ancStrength
-                }
-            }
-
-            equalizerRow
-
-            Button(action: openDetail) {
-                HStack(spacing: 6) {
-                    Image(systemName: "gearshape")
-                    Text("Settings…")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
+            Spacer(minLength: 0)
         }
-    }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
 
-    /// Per-earbud charge plus the case, each on its own dial. The case reports
-    /// only while the buds are sitting in it, so it shows "—" the rest of the
-    /// time rather than a misleading 0%.
-    private var batteries: some View {
-        let status = bluetooth.status
-        let showCase = bluetooth.connectedModel?.supportsCaseBattery == true
-        return HStack(spacing: showCase ? 12 : 28) {
-            CircularBatteryGauge(
-                level: status.batteryLeft, label: "Left",
-                present: status.batteryLeft > 0, charging: status.isLeftCharging,
-                diameter: showCase ? 66 : 76)
-            CircularBatteryGauge(
-                level: status.batteryRight, label: "Right",
-                present: status.batteryRight > 0, charging: status.isRightCharging,
-                diameter: showCase ? 66 : 76)
-            if showCase {
-                CircularBatteryGauge(
-                    level: status.batteryCase, label: "Case",
-                    present: status.batteryCase > 0, diameter: 66)
+        if model?.supportsANC == true {
+            sectionDivider
+            sectionTitle("Listening Mode")
+            ForEach(model?.listenModes ?? []) { mode in
+                MenuRow(
+                    title: LocalizedStringKey(mode.displayName), icon: mode.iconName,
+                    checked: status.noiseControlMode == mode
+                ) { bluetooth.setNoiseControl(mode) }
+            }
+            if model?.supportsAncStrength == true {
+                let active = status.noiseControlMode == .anc
+                HStack(spacing: 10) {
+                    Text("ANC strength").font(.system(size: 13))
+                    Spacer()
+                    AncStrengthStepper(
+                        level: status.ancLevel, count: model?.ancLevelCount ?? 2, tint: tint
+                    ) { bluetooth.setAncLevel($0) }
+                    .frame(width: 150)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+                .disabled(!active)
+                .opacity(active ? 1 : 0.4)
             }
         }
-    }
 
-    private var listenMode: some View {
-        ListenModePicker(
-            modes: bluetooth.connectedModel?.listenModes ?? [],
-            selection: bluetooth.status.noiseControlMode,
-            tint: tint
-        ) { bluetooth.setNoiseControl($0) }
-    }
-
-    /// Strength only means anything while ANC is the active mode — adaptive
-    /// picks its own. Dimmed rather than hidden so switching modes doesn't
-    /// resize the panel under the pointer.
-    private var ancStrength: some View {
-        let active = bluetooth.status.noiseControlMode == .anc
-        return HStack(spacing: 10) {
-            Text("ANC strength").font(.system(size: 11)).foregroundStyle(.secondary)
-            AncStrengthStepper(
-                level: bluetooth.status.ancLevel,
-                count: bluetooth.connectedModel?.ancLevelCount ?? 2,
-                tint: tint
-            ) { bluetooth.setAncLevel($0) }
+        if model?.supportsDetectConversations == true {
+            sectionDivider
+            sectionTitle("Auto switch to ambient sound")
+            MenuRow(title: "Off", icon: "person.wave.2", checked: !status.detectConversations) {
+                bluetooth.setDetectConversations(false)
+            }
+            MenuRow(title: "On", icon: "person.wave.2.fill", checked: status.detectConversations) {
+                bluetooth.setDetectConversations(true)
+            }
         }
-        .disabled(!active)
-        .opacity(active ? 1 : 0.4)
+
+        sectionDivider
+        equalizerRow
     }
 
     private var equalizerRow: some View {
@@ -124,8 +102,7 @@ struct MenuPopoverView: View {
             ? EqualizerPreset.allCases
             : EqualizerPreset.allCases.filter { $0 != .custom }
         return HStack(spacing: 8) {
-            Image(systemName: "slider.horizontal.3").font(.system(size: 13)).foregroundStyle(.secondary)
-            Text("Equalizer").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("Equalizer").font(.system(size: 13))
             Spacer()
             Menu {
                 ForEach(presets) { preset in
@@ -135,61 +112,46 @@ struct MenuPopoverView: View {
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Text(LocalizedStringKey(bluetooth.status.equalizerPreset.displayName))
+                    Text(LocalizedStringKey(status.equalizerPreset.displayName))
                     Image(systemName: "chevron.up.chevron.down").font(.system(size: 10))
                 }
-                .font(.system(size: 12))
-                .foregroundStyle(.primary)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
     }
 
-    private var footer: some View {
-        VStack(spacing: 10) {
-            Divider()
-            HStack(spacing: 10) {
-                if bluetooth.isConnected && !bluetooth.handedOffToPhone {
-                    Button {
-                        bluetooth.handOffToPhone()
-                    } label: {
-                        VStack(spacing: 2) {
-                            Image(systemName: "iphone").font(.system(size: 13))
-                            Text("To phone").font(.system(size: 9))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help("Send audio to phone")
-                }
+    // MARK: - Footer
 
-                Button(role: .destructive) {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    VStack(spacing: 2) {
-                        Image(systemName: "power").font(.system(size: 13))
-                        Text("Quit").font(.system(size: 9))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+    @ViewBuilder
+    private var footer: some View {
+        sectionDivider
+        if bluetooth.isConnected {
+            MenuRow(title: "Settings…", icon: "gearshape", checked: nil, action: openDetail)
+            if !bluetooth.handedOffToPhone {
+                MenuRow(title: "To phone", icon: "iphone", checked: nil) { bluetooth.handOffToPhone() }
+                    .help("Send audio to phone")
             }
         }
+        MenuRow(title: "Quit", icon: "power", checked: nil) { NSApplication.shared.terminate(nil) }
     }
+
+    // MARK: - Other states
 
     /// Shown while the buds are intentionally handed off to the phone: audio
     /// + control are both down, and auto-reconnect is suppressed.
     private var handedOff: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Image(systemName: "iphone.radiowaves.left.and.right")
-                .font(.system(size: 36))
+                .font(.system(size: 32))
                 .foregroundStyle(tint)
             VStack(spacing: 3) {
                 Text(verbatim: bluetooth.connectedName
                      ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                 Text("Audio on phone")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -206,13 +168,14 @@ struct MenuPopoverView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
-        .padding(.vertical, 10)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 
     private var disconnected: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Image(systemName: "airpodspro")
-                .font(.system(size: 44))
+                .font(.system(size: 40))
                 .foregroundStyle(.secondary)
             Text("No Buds Connected").font(.headline)
             Text("Connect your Galaxy Buds to get started.")
@@ -225,6 +188,65 @@ struct MenuPopoverView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
-        .padding(.vertical, 10)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - Building blocks
+
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+    }
+
+    private var sectionDivider: some View {
+        Divider().padding(.horizontal, 10).padding(.vertical, 5)
+    }
+}
+
+/// A menu-item row with the hover highlight an NSMenu item gets. `checked`
+/// is nil for plain actions, which drop the checkmark column so they line up
+/// with the section titles; a Bool reserves the column and ticks it.
+private struct MenuRow: View {
+    let title: LocalizedStringKey
+    let icon: String?
+    let checked: Bool?
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if let checked {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 14)
+                        .opacity(checked ? 1 : 0)
+                }
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 13))
+                        .frame(width: 18)
+                        .foregroundStyle(.secondary)
+                }
+                Text(title).font(.system(size: 13))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(hovering ? Color.primary.opacity(0.08) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 6)
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(checked == true ? [.isButton, .isSelected] : .isButton)
     }
 }

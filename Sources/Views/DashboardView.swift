@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// The detailed window shown when connected — a Galaxy Wear-style layout: a
-/// hero with the earbud illustration, circular battery gauges, a node-based
-/// noise-control selector, ANC strength, auto-switch, and a grouped settings
-/// list. "Sound & ANC" pushes to a sub-page.
+/// The dashboard shown in the menu-bar panel behind "Settings…". Everything
+/// sits straight on the panel's glass, the way the system's own menu-bar
+/// panels do: the device and its batteries, a titled Listening Mode section
+/// with the pill picker, the two noise settings as rows, the sub-pages as
+/// rows with a coloured glyph, and the app-level actions at the bottom —
+/// sections separated by hairlines, nothing boxed. The panel is exactly as
+/// tall as this content.
 struct DashboardView: View {
     @Bindable var bluetooth: BluetoothManager
     @State private var showSoundAnc = false
@@ -15,7 +18,7 @@ struct DashboardView: View {
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     private var status: BudsStatus { bluetooth.status }
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
     private var supportsAnc: Bool { bluetooth.connectedModel?.supportsANC == true }
 
     var body: some View {
@@ -32,208 +35,203 @@ struct DashboardView: View {
         } else if showFirmware {
             FirmwareUpdateView(bluetooth: bluetooth) { showFirmware = false }
         } else {
-            ScrollView {
-                VStack(spacing: 16) {
-                    hero
-                    settingsList
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                if supportsAnc {
+                    sectionDivider
+                    listeningSection
+                    noiseRows
                 }
-                .padding(16)
+                sectionDivider
+                pageRows
+                sectionDivider
+                appRows
             }
-            .frame(width: 440, height: 600)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 8)
+            .frame(width: DetailLayout.width)
         }
     }
 
-    // MARK: - Hero
+    // MARK: - Header
 
-    private var hero: some View {
-        VStack(spacing: 14) {
+    private var header: some View {
+        HStack(spacing: 10) {
             Image(systemName: "airpodspro")
-                .font(.system(size: 54, weight: .medium))
-                .foregroundStyle(tint)
-
-            VStack(spacing: 2) {
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(tint))
+            VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: bluetooth.connectedName
                      ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
-                    .font(.system(size: 17, weight: .semibold))
-                if bluetooth.connectedName != nil {
-                    Text(verbatim: bluetooth.connectedModel?.rawValue ?? "")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                BatteryGlyphLine(
+                    status: status,
+                    showsCase: bluetooth.connectedModel?.supportsCaseBattery == true)
             }
-
-            batteries
-
-            if supportsAnc {
-                nodeSelector
-                if bluetooth.connectedModel?.supportsAncStrength == true {
-                    Divider()
-                    ancStrengthRow
-                }
-                if bluetooth.connectedModel?.supportsDetectConversations == true {
-                    Divider()
-                    autoSwitchRow
-                }
-            }
+            Spacer(minLength: 0)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .controlBackgroundColor)))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
 
-    /// Same three dials as the menu-bar popover, sized for the wider window, so
-    /// the two surfaces report charge identically. The case reads "—" whenever
-    /// the buds are out of it and it has nothing to report.
-    private var batteries: some View {
-        let showCase = bluetooth.connectedModel?.supportsCaseBattery == true
-        return HStack(spacing: showCase ? 18 : 30) {
-            CircularBatteryGauge(
-                level: status.batteryLeft, label: "Left",
-                present: status.batteryLeft > 0, charging: status.isLeftCharging,
-                diameter: showCase ? 84 : 90)
-            CircularBatteryGauge(
-                level: status.batteryRight, label: "Right",
-                present: status.batteryRight > 0, charging: status.isRightCharging,
-                diameter: showCase ? 84 : 90)
-            if showCase {
-                CircularBatteryGauge(
-                    level: status.batteryCase, label: "Case",
-                    present: status.batteryCase > 0, diameter: 84)
-            }
-        }
-    }
+    // MARK: - Listening mode
 
-    private var nodeSelector: some View {
-        ListenModePicker(
-            modes: bluetooth.connectedModel?.listenModes ?? [],
-            selection: status.noiseControlMode,
-            tint: tint
-        ) { bluetooth.setNoiseControl($0) }
-        .padding(.top, 4)
-    }
-
-    /// Dimmed unless ANC is the active mode, matching the menu-bar panel and the
-    /// Sound & ANC page — strength has no effect in ambient, off or adaptive.
-    private var ancStrengthRow: some View {
-        let active = status.noiseControlMode == .anc
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("ANC strength").font(.system(size: 13))
-            AncStrengthStepper(
-                level: status.ancLevel,
-                count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+    private var listeningSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Listening Mode")
+            ListenModePicker(
+                modes: bluetooth.connectedModel?.listenModes ?? [],
+                selection: status.noiseControlMode,
                 tint: tint
-            ) { bluetooth.setAncLevel($0) }
+            ) { bluetooth.setNoiseControl($0) }
+            .padding(.horizontal, 10)
         }
-        .disabled(!active)
-        .opacity(active ? 1 : 0.4)
+        .padding(.bottom, 8)
     }
 
-    private var autoSwitchRow: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Auto switch to ambient sound").font(.system(size: 13))
-                Text("During conversations")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+    /// ANC strength and conversation detection as plain rows, each gated per
+    /// model. Strength is dimmed unless ANC is the active mode — it has no
+    /// effect in ambient, off or adaptive.
+    @ViewBuilder
+    private var noiseRows: some View {
+        if bluetooth.connectedModel?.supportsAncStrength == true {
+            let active = status.noiseControlMode == .anc
+            row("ANC strength") {
+                AncStrengthStepper(
+                    level: status.ancLevel,
+                    count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+                    tint: tint
+                ) { bluetooth.setAncLevel($0) }
+                .frame(width: 200)
             }
-            Spacer()
+            .disabled(!active)
+            .opacity(active ? 1 : 0.45)
+        }
+        if bluetooth.connectedModel?.supportsDetectConversations == true {
+            row("Auto switch to ambient sound", subtitle: "During conversations") {
+                Toggle("", isOn: Binding(
+                    get: { status.detectConversations },
+                    set: { bluetooth.setDetectConversations($0) }
+                ))
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
+        }
+    }
+
+    // MARK: - Pages
+
+    /// One row per sub-page. Models without the custom equalizer page pick a
+    /// preset from the row's menu instead.
+    @ViewBuilder
+    private var pageRows: some View {
+        if supportsAnc {
+            pageRow("Sound & ANC", icon: "ear.badge.waveform", color: .blue) { showSoundAnc = true }
+            pageRow("Earbud controls", icon: "hand.tap.fill", color: .gray) { showEarbudControls = true }
+        }
+        if bluetooth.connectedModel?.supportsCustomEqualizer == true {
+            pageRow("Equalizer", icon: "slider.vertical.3", color: .orange) { showEqualizer = true }
+        } else {
+            row("Equalizer", icon: "slider.horizontal.3", color: .orange) {
+                Menu {
+                    ForEach(EqualizerPreset.allCases.filter { $0 != .custom }) { preset in
+                        Button { bluetooth.setEqualizer(preset) } label: {
+                            Text(LocalizedStringKey(preset.displayName))
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(LocalizedStringKey(status.equalizerPreset.displayName))
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 10))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            }
+        }
+        pageRow("Find earbuds", icon: "bell.badge.fill", color: .green) { showFindMyEarbuds = true }
+        pageRow("Firmware", icon: "arrow.down.circle.fill", color: .indigo) { showFirmware = true }
+        pageRow("About", icon: "info", color: .gray) { showAbout = true }
+    }
+
+    // MARK: - App
+
+    @ViewBuilder
+    private var appRows: some View {
+        row("Launch at login", icon: "power", color: .gray) {
             Toggle("", isOn: Binding(
-                get: { status.detectConversations },
-                set: { bluetooth.setDetectConversations($0) }
+                get: { launchAtLogin },
+                set: { launchAtLogin = $0; LaunchAtLogin.set($0) }
             ))
             .labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
-    }
-
-    // MARK: - Settings list
-
-    private var settingsList: some View {
-        VStack(spacing: 14) {
-            if supportsAnc {
-                group {
-                    navRow(icon: "ear.badge.waveform", title: "Sound & ANC") { showSoundAnc = true }
-                    Divider()
-                    navRow(icon: "hand.tap", title: "Earbud controls") { showEarbudControls = true }
-                }
+        Button { bluetooth.disconnect() } label: {
+            HStack(spacing: 10) {
+                glyph("xmark", color: .gray)
+                Text("Disconnect").font(.system(size: 13))
+                Spacer(minLength: 0)
             }
-            group {
-                if bluetooth.connectedModel?.supportsCustomEqualizer == true {
-                    navRow(icon: "slider.vertical.3", title: "Equalizer") { showEqualizer = true }
-                } else {
-                    row(icon: "slider.horizontal.3", title: "Equalizer") {
-                        Menu {
-                            ForEach(EqualizerPreset.allCases.filter { $0 != .custom }) { preset in
-                                Button { bluetooth.setEqualizer(preset) } label: {
-                                    Text(LocalizedStringKey(preset.displayName))
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(LocalizedStringKey(status.equalizerPreset.displayName))
-                                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11))
-                            }
-                            .foregroundStyle(.secondary)
-                        }
-                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    }
-                }
-            }
-            group {
-                navRow(icon: "bell.badge", title: "Find earbuds") { showFindMyEarbuds = true }
-                Divider()
-                navRow(icon: "arrow.down.circle", title: "Firmware") { showFirmware = true }
-                Divider()
-                navRow(icon: "info.circle", title: "About") { showAbout = true }
-            }
-            group {
-                row(icon: "power", title: "Launch at login") {
-                    Toggle("", isOn: Binding(
-                        get: { launchAtLogin },
-                        set: { launchAtLogin = $0; LaunchAtLogin.set($0) }
-                    ))
-                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                }
-            }
-            group {
-                Button(action: { bluetooth.disconnect() }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 17)).foregroundStyle(.red).frame(width: 22)
-                        Text("Disconnect").font(.system(size: 14)).foregroundStyle(.red)
-                        Spacer()
-                    }
-                    .padding(.vertical, 12)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
         }
+        .buttonStyle(GlassRowButtonStyle())
     }
 
     // MARK: - Building blocks
 
-    private func group<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(spacing: 0) { content() }
-            .padding(.horizontal, 14)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.top, 2)
+    }
+
+    private var sectionDivider: some View {
+        Divider().padding(.horizontal, 4).padding(.vertical, 7)
     }
 
     private func row<Trailing: View>(
-        icon: String, title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing
+        _ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil,
+        icon: String? = nil, color: Color = .gray,
+        @ViewBuilder trailing: () -> Trailing
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(.secondary).frame(width: 22)
-            Text(title).font(.system(size: 14))
-            Spacer()
+        HStack(spacing: 10) {
+            if let icon { glyph(icon, color: color) }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 13))
+                if let subtitle {
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
             trailing()
         }
-        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .frame(minHeight: 34)
     }
 
-    private func navRow(icon: String, title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+    private func pageRow(
+        _ title: LocalizedStringKey, icon: String, color: Color, action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            row(icon: icon, title: title) {
-                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
+            row(title, icon: icon, color: color) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassRowButtonStyle())
+    }
+
+    /// The coloured disc the system's Bluetooth panel puts before a device.
+    private func glyph(_ symbol: String, color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 24, height: 24)
+            .background(Circle().fill(color))
     }
 }

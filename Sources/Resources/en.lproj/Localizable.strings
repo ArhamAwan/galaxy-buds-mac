@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "The earbuds couldn't verify the firmware.";
 "The update failed." = "The update failed.";
 "The earbuds disconnected." = "The earbuds disconnected.";
+
+// Panel sections
+"Listening Mode" = "Listening Mode";
+"On" = "On";
+"Noise Cancelling" = "Noise Cancelling";
+"Ambient Sound" = "Ambient Sound";

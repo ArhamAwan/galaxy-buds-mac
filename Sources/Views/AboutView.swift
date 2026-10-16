@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// "About" / diagnostics page: software version, serial numbers, and the earbud
-/// fit (seal) test. Requests the info on appear.
+/// fit (seal) test, as titled runs of rows straight on the panel's glass with
+/// a hairline between them. Requests the info on appear.
 struct AboutView: View {
     @Bindable var bluetooth: BluetoothManager
     let onBack: () -> Void
@@ -10,79 +11,51 @@ struct AboutView: View {
     @State private var diagnosticsCopied = false
 
     private var status: BudsStatus { bluetooth.status }
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
     private var supportsFitTest: Bool { bluetooth.connectedModel?.supportsAdaptiveANC == true }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(spacing: 18) {
-                    infoSection
-                    if supportsFitTest { fitTestSection }
-                    diagnosticsSection
-                }
-                .padding(18)
+        DetailPage(title: "About", onBack: {
+            if fitTestActive { bluetooth.setFitTest(active: false) }
+            onBack()
+        }) {
+            infoSection
+            if supportsFitTest {
+                GlassDivider()
+                fitTestSection
             }
+            GlassDivider()
+            diagnosticsSection
         }
-        .frame(width: 440, height: 560)
         .onAppear { bluetooth.requestAboutInfo() }
         .onDisappear { if fitTestActive { bluetooth.setFitTest(active: false) } }
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button(action: { if fitTestActive { bluetooth.setFitTest(active: false) }; onBack() }) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundStyle(tint)
-            }
-            .buttonStyle(.plain)
-            Spacer()
-            Text("About").font(.system(size: 15, weight: .semibold))
-            Spacer()
-            Color.clear.frame(width: 44, height: 1)
-        }
-        .padding(14)
-    }
-
     private var infoSection: some View {
-        section("Device") {
+        GlassSection(title: "Device") {
             infoRow("Model", value: bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
-            Divider()
             infoRow("Software version", value: status.softwareVersion.isEmpty ? "—" : status.softwareVersion)
-            Divider()
             infoRow("Left serial", value: status.serialLeft.isEmpty ? "—" : status.serialLeft)
-            Divider()
             infoRow("Right serial", value: status.serialRight.isEmpty ? "—" : status.serialRight)
         }
     }
 
     private var fitTestSection: some View {
-        section("Earbud fit test") {
-            VStack(spacing: 14) {
-                Text("Put both earbuds in and start the test to check the seal.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        GlassSection(title: "Earbud fit test") {
+            GlassFootnote(text: "Put both earbuds in and start the test to check the seal.")
 
-                HStack(spacing: 24) {
-                    fitResult("Left", result: status.fitLeft)
-                    fitResult("Right", result: status.fitRight)
-                }
-
-                Button(action: toggleFitTest) {
-                    Text(fitTestActive ? "Stop" : "Check earbud fit")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(fitTestActive ? .red : tint)
+            HStack(spacing: 24) {
+                fitResult("Left", result: status.fitLeft)
+                fitResult("Right", result: status.fitRight)
             }
-            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+
+            GlassActionButton(
+                title: fitTestActive ? "Stop" : "Check earbud fit",
+                tint: tint, prominent: !fitTestActive,
+                action: toggleFitTest
+            )
         }
     }
 
@@ -90,21 +63,13 @@ struct AboutView: View {
     /// into a bug report — the app keeps no log files, and connection problems
     /// are otherwise undiagnosable on hardware we can't reproduce.
     private var diagnosticsSection: some View {
-        section("Diagnostics") {
-            VStack(spacing: 12) {
-                Text("Copies the connection log, so you can paste it into a bug report on GitHub.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button(action: copyDiagnostics) {
-                    Text(diagnosticsCopied ? "Copied" : "Copy diagnostics")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-            }
-            .padding(.vertical, 12)
+        GlassSection(title: "Diagnostics") {
+            GlassFootnote(text: "Copies the connection log, so you can paste it into a bug report on GitHub.")
+            GlassActionButton(
+                title: diagnosticsCopied ? "Copied" : "Copy diagnostics",
+                prominent: false,
+                action: copyDiagnostics
+            )
         }
     }
 
@@ -134,7 +99,7 @@ struct AboutView: View {
             Text(text(result))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(color(result))
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -173,26 +138,14 @@ struct AboutView: View {
 
     // MARK: - Building blocks
 
-    private func section<Content: View>(
-        _ title: LocalizedStringKey, @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 12)).foregroundStyle(.secondary).padding(.leading, 4)
-            VStack(spacing: 0) { content() }
-                .padding(.horizontal, 12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
-        }
-    }
-
+    /// A label/value row; the value is monospaced so serials line up and can
+    /// be selected for a bug report.
     private func infoRow(_ title: LocalizedStringKey, value: String) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            Text(value)
+        GlassRow(title: title) {
+            Text(verbatim: value)
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
-        .padding(.vertical, 11)
     }
 }

@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "Gli auricolari non hanno potuto verificare il firmware.";
 "The update failed." = "Aggiornamento non riuscito.";
 "The earbuds disconnected." = "Gli auricolari si sono disconnessi.";
+
+// Panel sections
+"Listening Mode" = "Modalità di ascolto";
+"On" = "Attivo";
+"Noise Cancelling" = "Cancellazione del rumore";
+"Ambient Sound" = "Suono ambientale";

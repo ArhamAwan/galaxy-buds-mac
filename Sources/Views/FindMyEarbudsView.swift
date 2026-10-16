@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// "Find My Earbuds" detail page: rings both earbuds and lets you silence one
-/// side while searching for the other.
+/// side while searching for the other. The speaker glyph and its line sit
+/// straight on the glass above the full-width ring capsule; the Mute section
+/// only appears while the tone plays.
 struct FindMyEarbudsView: View {
     @Bindable var bluetooth: BluetoothManager
     let onBack: () -> Void
@@ -10,92 +12,57 @@ struct FindMyEarbudsView: View {
     @State private var muteLeft = false
     @State private var muteRight = false
 
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(spacing: 22) {
-                    ringControl
-                    if isRinging { muteSection }
-                }
-                .padding(18)
+        DetailPage(title: "Find earbuds", onBack: { stopRinging(); onBack() }) {
+            ringControl
+            if isRinging {
+                GlassDivider()
+                muteSection
             }
         }
-        .frame(width: 440, height: 560)
         .onDisappear { stopRinging() }
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button(action: { stopRinging(); onBack() }) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundStyle(tint)
-            }
-            .buttonStyle(.plain)
-            Spacer()
-            Text("Find earbuds").font(.system(size: 15, weight: .semibold))
-            Spacer()
-            Color.clear.frame(width: 44, height: 1)
-        }
-        .padding(14)
-    }
-
     private var ringControl: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             Image(systemName: isRinging ? "speaker.wave.3.fill" : "speaker.wave.2")
                 .font(.system(size: 56))
                 .foregroundStyle(isRinging ? tint : .secondary)
                 .symbolEffect(.variableColor, isActive: isRinging)
-                .padding(.top, 16)
+                .padding(.top, 20)
 
             Text(isRinging
                  ? "Playing a sound on your earbuds."
                  : "Ring your earbuds to locate them.")
-                .font(.subheadline)
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 10)
 
-            Button(action: toggleRinging) {
-                Text(isRinging ? "Stop" : "Play sound")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(isRinging ? .red : tint)
-            .padding(.horizontal, 40)
+            GlassActionButton(
+                title: isRinging ? "Stop" : "Play sound",
+                tint: tint, prominent: !isRinging,
+                action: toggleRinging
+            )
+            .padding(.top, 6)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 4)
     }
 
     private var muteSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Mute").font(.system(size: 12)).foregroundStyle(.secondary).padding(.leading, 4)
-            VStack(spacing: 0) {
-                muteRow("Left", isOn: $muteLeft)
-                Divider()
-                muteRow("Right", isOn: $muteRight)
+        GlassSection(title: "Mute") {
+            GlassToggleRow(title: "Left", isOn: muteLeft) {
+                muteLeft = $0
+                bluetooth.setMuteEarbud(left: muteLeft, right: muteRight)
             }
-            .padding(.horizontal, 12)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+            GlassToggleRow(title: "Right", isOn: muteRight) {
+                muteRight = $0
+                bluetooth.setMuteEarbud(left: muteLeft, right: muteRight)
+            }
         }
-    }
-
-    private func muteRow(_ title: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { isOn.wrappedValue },
-                set: { isOn.wrappedValue = $0; bluetooth.setMuteEarbud(left: muteLeft, right: muteRight) }
-            ))
-            .labelsHidden().toggleStyle(.switch).controlSize(.small)
-        }
-        .padding(.vertical, 10)
     }
 
     private func toggleRinging() {

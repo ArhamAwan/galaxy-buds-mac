@@ -36,7 +36,7 @@ struct FirmwareUpdateView: View {
     @State private var confirming: FirmwareRelease?
 
     private var status: BudsStatus { bluetooth.status }
-    private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
+    private var tint: Color { .accentColor }
     private var updater: FirmwareUpdater { bluetooth.firmware }
 
     private var batteryTooLow: Bool {
@@ -44,22 +44,24 @@ struct FirmwareUpdateView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                VStack(spacing: 18) {
-                    installedSection
-                    if updater.isRunning || isTerminal {
-                        transferSection
-                    } else {
-                        availableSection
-                    }
+        // Leaving the page mid-transfer would hide the progress and the
+        // warning, so the back chevron is inert while the updater runs.
+        DetailPage(title: "Firmware", onBack: { if !updater.isRunning { onBack() } }) {
+            GlassSection(title: "Installed") {
+                GlassRow(title: "Current version") {
+                    Text(verbatim: status.softwareVersion.isEmpty ? "—" : status.softwareVersion)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
-                .padding(18)
+            }
+            GlassDivider()
+            if updater.isRunning || isTerminal {
+                transferSection
+            } else {
+                availableSection
             }
         }
-        .frame(width: 440, height: 560)
         .confirmationDialog(
             "Install this firmware?",
             isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
@@ -84,165 +86,121 @@ struct FirmwareUpdateView: View {
         return false
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button(action: onBack) {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                }
-                .foregroundStyle(tint)
-            }
-            .buttonStyle(.plain)
-            .disabled(updater.isRunning)
-            Spacer()
-            Text("Firmware").font(.system(size: 15, weight: .semibold))
-            Spacer()
-            Color.clear.frame(width: 44, height: 1)
-        }
-        .padding(14)
-    }
-
-    // MARK: - Installed
-
-    private var installedSection: some View {
-        section("Installed") {
-            infoRow("Current version", value: status.softwareVersion.isEmpty ? "—" : status.softwareVersion)
-        }
-    }
-
     // MARK: - Available
 
-    @ViewBuilder
     private var availableSection: some View {
-        section("Update") {
-            VStack(spacing: 14) {
-                switch check {
-                case .idle:
-                    Text("Firmware comes from a community archive of Samsung's official builds, not from Samsung directly.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    checkButton
+        GlassSection(title: "Update") {
+            switch check {
+            case .idle:
+                GlassFootnote(text: "Firmware comes from a community archive of Samsung's official builds, not from Samsung directly.")
+                checkButton
 
-                case .checking:
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Checking for updates…").font(.system(size: 13))
+            case .checking:
+                progressRow(label: "Checking for updates…", value: nil)
+
+            case .upToDate:
+                resultRow(
+                    icon: "checkmark.circle.fill", color: .green,
+                    text: Text("Your earbuds are up to date."))
+                checkButton
+
+            case .available(let release):
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: release.buildName)
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    if !release.releaseDescription.isEmpty {
+                        Text(verbatim: release.releaseDescription)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                case .upToDate:
-                    resultRow(
-                        icon: "checkmark.circle.fill", color: .green,
-                        text: Text("Your earbuds are up to date."))
-                    checkButton
-
-                case .available(let release):
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(release.buildName)
-                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        if !release.releaseDescription.isEmpty {
-                            Text(release.releaseDescription)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if batteryTooLow {
-                        resultRow(
-                            icon: "exclamationmark.triangle.fill", color: .orange,
-                            text: Text("Charge both earbuds before updating — each needs at least half its battery."))
-                    }
-
-                    Button {
-                        confirming = release
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isDownloading { ProgressView().controlSize(.small) }
-                            Text(isDownloading ? "Downloading…" : "Install update")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(tint)
-                    .disabled(batteryTooLow || isDownloading || !bluetooth.isConnected)
-
-                case .failed(let message):
-                    resultRow(icon: "exclamationmark.triangle.fill", color: .red, text: Text(message))
-                    checkButton
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+
+                if batteryTooLow {
+                    resultRow(
+                        icon: "exclamationmark.triangle.fill", color: .orange,
+                        text: Text("Charge both earbuds before updating — each needs at least half its battery."))
+                }
+
+                // The download has no cancel, so while it runs the button gives
+                // way to a progress row rather than sitting there greyed out.
+                if isDownloading {
+                    progressRow(label: "Downloading…", value: nil)
+                } else {
+                    GlassActionButton(
+                        title: "Install update", tint: tint,
+                        enabled: !(batteryTooLow || isDownloading || !bluetooth.isConnected)
+                    ) { confirming = release }
+                }
+
+            case .failed(let message):
+                resultRow(icon: "exclamationmark.triangle.fill", color: .red, text: Text(message))
+                checkButton
             }
-            .padding(.vertical, 12)
         }
     }
 
     private var checkButton: some View {
-        Button("Check for updates") { Task { await runCheck() } }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .frame(maxWidth: .infinity)
-            .disabled(!bluetooth.isConnected || status.softwareVersion.isEmpty)
+        GlassActionButton(
+            title: "Check for updates", tint: tint,
+            enabled: bluetooth.isConnected && !status.softwareVersion.isEmpty
+        ) { Task { await runCheck() } }
     }
 
     // MARK: - Transfer
 
-    @ViewBuilder
     private var transferSection: some View {
-        section("Update") {
-            VStack(spacing: 14) {
-                switch updater.phase {
-                case .preparing:
-                    progressRow(label: "Preparing…", value: nil)
-                case .sending(let fraction):
-                    progressRow(label: "Sending firmware…", value: fraction)
-                case .installing(let percent):
-                    progressRow(label: "Installing…", value: Double(percent) / 100)
-                case .finished:
-                    resultRow(
-                        icon: "checkmark.circle.fill", color: .green,
-                        text: Text("Firmware sent. The earbuds are installing it and will reconnect on their own."))
-                    doneButton
-                case .failed(let message):
-                    resultRow(icon: "exclamationmark.triangle.fill", color: .red, text: Text(message))
-                    doneButton
-                case .idle:
-                    EmptyView()
-                }
-
-                if updater.isRunning {
-                    Text("Don't quit the app or move the earbuds away from your Mac.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+        GlassSection(title: "Update") {
+            switch updater.phase {
+            case .preparing:
+                progressRow(label: "Preparing…", value: nil)
+            case .sending(let fraction):
+                progressRow(label: "Sending firmware…", value: fraction)
+            case .installing(let percent):
+                progressRow(label: "Installing…", value: Double(percent) / 100)
+            case .finished:
+                resultRow(
+                    icon: "checkmark.circle.fill", color: .green,
+                    text: Text("Firmware sent. The earbuds are installing it and will reconnect on their own."))
+                doneButton
+            case .failed(let message):
+                resultRow(icon: "exclamationmark.triangle.fill", color: .red, text: Text(message))
+                doneButton
+            case .idle:
+                EmptyView()
             }
-            .padding(.vertical, 12)
+
+            if updater.isRunning {
+                GlassFootnote(text: "Don't quit the app or move the earbuds away from your Mac.")
+            }
         }
     }
 
     private var doneButton: some View {
-        Button("Done") {
+        GlassActionButton(title: "Done", prominent: false) {
             updater.reset()
             check = .idle
         }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
-        .frame(maxWidth: .infinity)
     }
 
+    /// A determinate phase gets a bar under its label; an indeterminate one
+    /// is a plain row with a spinner at the trailing edge.
+    @ViewBuilder
     private func progressRow(label: LocalizedStringKey, value: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label).font(.system(size: 13))
-            if let value {
+        if let value {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(label).font(.system(size: 13))
                 ProgressView(value: value).tint(tint)
-            } else {
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        } else {
+            GlassRow(title: label) {
                 ProgressView().controlSize(.small)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Takes a `Text` so callers can pass either a localized literal or an
@@ -253,6 +211,8 @@ struct FirmwareUpdateView: View {
             text.font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Actions
@@ -286,30 +246,5 @@ struct FirmwareUpdateView: View {
                 check = .failed(error.localizedDescription)
             }
         }
-    }
-
-    // MARK: - Building blocks
-
-    private func section<Content: View>(
-        _ title: LocalizedStringKey, @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 12)).foregroundStyle(.secondary).padding(.leading, 4)
-            VStack(spacing: 0) { content() }
-                .padding(.horizontal, 12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
-        }
-    }
-
-    private func infoRow(_ title: LocalizedStringKey, value: String) -> some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
-            Text(value)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .padding(.vertical, 11)
     }
 }

@@ -14,6 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bluetooth = BluetoothManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Headless render for design iteration; must run before the
+        // single-instance hand-off or a running copy would swallow it.
+        if PreviewRenderer.renderIfRequested() {
+            NSApp.terminate(nil)
+            return
+        }
         // Single instance: if another copy is already running, hand off to it
         // and quit. Two instances would fight over the one RFCOMM channel to
         // the buds and show duplicate menu-bar icons.
@@ -48,8 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bluetooth.startAutoConnect()
         // Defer the launch panel so the status item is laid out first; otherwise
         // it anchors to a not-yet-positioned button and appears detached.
+        // `--settings` opens straight onto the dashboard; used to screenshot
+        // and iterate on the detail view without clicking through the panel.
+        let openSettings = ProcessInfo.processInfo.arguments.contains("--settings")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             self?.statusBarController?.showPanel()
+            if openSettings { self?.statusBarController?.openDetailWindow() }
         }
         startObservingStatus()
         observeSleepAndWake()

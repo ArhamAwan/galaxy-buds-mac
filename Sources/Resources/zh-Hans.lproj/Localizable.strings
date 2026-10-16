@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "耳机无法校验固件。";
 "The update failed." = "更新失败。";
 "The earbuds disconnected." = "耳机已断开连接。";
+
+// Panel sections
+"Listening Mode" = "聆听模式";
+"On" = "开";
+"Noise Cancelling" = "降噪";
+"Ambient Sound" = "环境音";

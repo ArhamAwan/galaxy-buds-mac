@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "Kulaklık yazılımı doğrulayamadı.";
 "The update failed." = "Güncelleme başarısız oldu.";
 "The earbuds disconnected." = "Kulaklık bağlantısı kesildi.";
+
+// Panel sections
+"Listening Mode" = "Dinleme Modu";
+"On" = "Açık";
+"Noise Cancelling" = "Gürültü Engelleme";
+"Ambient Sound" = "Ortam Sesi";

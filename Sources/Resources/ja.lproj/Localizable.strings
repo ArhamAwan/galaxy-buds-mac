@@ -157,3 +157,9 @@
 "The earbuds couldn't verify the firmware." = "イヤホンがファームウェアを検証できませんでした。";
 "The update failed." = "アップデートに失敗しました。";
 "The earbuds disconnected." = "イヤホンの接続が切れました。";
+
+// Panel sections
+"Listening Mode" = "リスニングモード";
+"On" = "オン";
+"Noise Cancelling" = "ノイズキャンセリング";
+"Ambient Sound" = "周囲の音";
