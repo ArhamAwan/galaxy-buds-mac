@@ -39,7 +39,20 @@ enum LaunchAtLogin {
     /// "doesn't start at login" report shows which side forgot.
     static func restoreIfNeeded() {
         let status = SMAppService.mainApp.status
-        let wanted = UserDefaults.standard.object(forKey: preferenceKey) as? Bool
+        var wanted = UserDefaults.standard.object(forKey: preferenceKey) as? Bool
+        // First launch under a new bundle id: the preference lives in the old
+        // id's domain. Carry it over so the login item comes back without the
+        // user having to find the switch again.
+        if wanted == nil {
+            for domain in ["com.nivorbit.galaxybuds", "com.nivorbit.budsapp"] {
+                if let legacy = UserDefaults(suiteName: domain)?.object(forKey: preferenceKey) as? Bool {
+                    wanted = legacy
+                    UserDefaults.standard.set(legacy, forKey: preferenceKey)
+                    DiagnosticsLog.shared.log("launch at login: preference migrated from \(domain)")
+                    break
+                }
+            }
+        }
         DiagnosticsLog.shared.log(
             "launch at login: status \(status.rawValue), preference \(wanted.map(String.init) ?? "unset"), "
             + "path \(Bundle.main.bundlePath)")

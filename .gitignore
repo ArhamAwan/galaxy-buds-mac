@@ -1,5 +1,6 @@
 # Build output
 BudsApp.app/
+Budsy.app/
 .build/
 dist/
 *.dmg
