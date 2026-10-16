@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-If you discover a security issue in Galaxy Buds for Mac, please report it
+If you discover a security issue in Budsy, please report it
 privately rather than opening a public issue:
 
 - Email: **vedat@nivorbit.com**
@@ -29,5 +29,5 @@ Each release `.dmg` has a SHA-256 published in the GitHub release notes and in
 the Homebrew cask. Verify it before installing:
 
 ```bash
-shasum -a 256 Galaxy-Buds-<version>.dmg
+shasum -a 256 Budsy-<version>.dmg
 ```

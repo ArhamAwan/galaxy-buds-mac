@@ -1,4 +1,4 @@
-"Welcome to BudsApp" = "Добро пожаловать в BudsApp";
+"Welcome to Budsy" = "Добро пожаловать в Budsy";
 "Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more." = "Подключите Samsung Galaxy Buds,\nчтобы видеть заряд, управлять ANC и не только.";
 "Get Started" = "Начать";
 "Select Your Model" = "Выберите модель";
@@ -43,7 +43,7 @@
 "Find Buds" = "Найти наушники";
 "Stop Find" = "Остановить поиск";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Служба управления Galaxy Buds не найдена. Попробуйте удалить и заново подключить наушники в Системных настройках → Bluetooth.";
-"Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Доступ к Bluetooth запрещён. Разрешите BudsApp в Системных настройках → Конфиденциальность и безопасность → Bluetooth.";
+"Bluetooth permission denied. Allow Budsy under System Settings → Privacy & Security → Bluetooth." = "Доступ к Bluetooth запрещён. Разрешите Budsy в Системных настройках → Конфиденциальность и безопасность → Bluetooth.";
 "Bluetooth is off. Please turn it on." = "Bluetooth выключен. Включите его.";
 "Listen mode" = "Режим звука";
 "Play sound" = "Воспроизвести звук";
@@ -101,7 +101,7 @@
 "Adjust fit" = "Поправьте посадку";
 "Test failed" = "Тест не пройден";
 "Quit" = "Выход";
-"Quit Galaxy Buds" = "Завершить Galaxy Buds";
+"Quit Budsy" = "Завершить Budsy";
 
 "To phone" = "На телефон";
 "Audio on phone" = "Звук на телефоне";

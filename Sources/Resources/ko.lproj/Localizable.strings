@@ -1,4 +1,4 @@
-"Welcome to BudsApp" = "BudsApp에 오신 것을 환영합니다";
+"Welcome to Budsy" = "Budsy에 오신 것을 환영합니다";
 "Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more." = "Samsung Galaxy Buds를 연결하여\n배터리 정보, ANC 제어 등을 확인하세요.";
 "Get Started" = "시작하기";
 "Select Your Model" = "모델 선택";
@@ -43,7 +43,7 @@
 "Find Buds" = "버즈 찾기";
 "Stop Find" = "찾기 중지";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Galaxy Buds 제어 서비스를 찾을 수 없습니다. 시스템 설정 → Bluetooth에서 이어버드를 제거한 후 다시 페어링해 보세요.";
-"Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Bluetooth 권한이 거부되었습니다. 시스템 설정 → 개인정보 보호 및 보안 → Bluetooth에서 BudsApp을 허용하세요.";
+"Bluetooth permission denied. Allow Budsy under System Settings → Privacy & Security → Bluetooth." = "Bluetooth 권한이 거부되었습니다. 시스템 설정 → 개인정보 보호 및 보안 → Bluetooth에서 Budsy을 허용하세요.";
 "Bluetooth is off. Please turn it on." = "Bluetooth가 꺼져 있습니다. 켜 주세요.";
 "Listen mode" = "듣기 모드";
 "Play sound" = "소리 재생";
@@ -101,7 +101,7 @@
 "Adjust fit" = "착용 조정";
 "Test failed" = "테스트 실패";
 "Quit" = "종료";
-"Quit Galaxy Buds" = "Galaxy Buds 종료";
+"Quit Budsy" = "Budsy 종료";
 
 "To phone" = "폰으로";
 "Audio on phone" = "오디오가 폰에서 재생 중";

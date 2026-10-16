@@ -33,7 +33,11 @@ struct DashboardView: View {
         } else if showAbout {
             AboutView(bluetooth: bluetooth) { showAbout = false }
         } else if showFirmware {
+            #if APPSTORE
+            EmptyView()
+            #else
             FirmwareUpdateView(bluetooth: bluetooth) { showFirmware = false }
+            #endif
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -152,7 +156,11 @@ struct DashboardView: View {
             }
         }
         pageRow("Find earbuds", icon: "bell.badge.fill", color: .green) { showFindMyEarbuds = true }
+        // Firmware comes from a community archive of Samsung's builds, which
+        // the App Store build leaves out; the direct download keeps it.
+        #if !APPSTORE
         pageRow("Firmware", icon: "arrow.down.circle.fill", color: .indigo) { showFirmware = true }
+        #endif
         pageRow("About", icon: "info", color: .gray) { showAbout = true }
     }
 

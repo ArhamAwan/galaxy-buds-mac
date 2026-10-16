@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_NAME="BudsApp"
+APP_NAME="Budsy"
 APP_BUNDLE="$APP_NAME.app"
 SDK_PATH=$(xcrun --show-sdk-path)
 
@@ -70,7 +70,7 @@ done
 # app crashes on first Bluetooth access ("missing usage description").
 echo "Signing (ad-hoc)..."
 codesign --force --sign - \
-  --identifier com.nivorbit.galaxybuds \
+  --identifier com.nivorbit.budsy \
   "$APP_BUNDLE"
 codesign --verify --verbose "$APP_BUNDLE" 2>&1 | tail -1
 

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Developer aid: `BudsApp --preview <dir>` renders the panel views to PNGs
+/// Developer aid: `Budsy --preview <dir>` renders the panel views to PNGs
 /// against a stand-in connected device and exits, without touching Bluetooth
 /// or the screen. Lets layout changes be checked in both appearances from a
 /// script instead of by screenshotting a live panel that closes on the first
@@ -16,20 +16,7 @@ enum PreviewRenderer {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let bluetooth = BluetoothManager()
-        bluetooth.isConnected = true
-        bluetooth.connectedModel = .buds4Pro
-        bluetooth.connectedName = "Vedat's Buds4 Pro"
-        var status = BudsStatus()
-        status.batteryLeft = 77
-        status.batteryRight = 70
-        status.batteryCase = 0
-        status.noiseControlMode = .anc
-        status.ancLevel = 4
-        status.equalizerPreset = .bassBoost
-        status.softwareVersion = "R640XXU0AZD2"
-        status.isLeftWearing = true
-        status.isRightWearing = true
-        bluetooth.status = status
+        bluetooth.enterDemoMode()
 
         for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
             render(MenuPopoverView(bluetooth: bluetooth) {},
@@ -41,7 +28,6 @@ enum PreviewRenderer {
                 ("earbud-controls", AnyView(EarbudControlsView(bluetooth: bluetooth) {})),
                 ("equalizer", AnyView(EqualizerView(bluetooth: bluetooth) {})),
                 ("find", AnyView(FindMyEarbudsView(bluetooth: bluetooth) {})),
-                ("firmware", AnyView(FirmwareUpdateView(bluetooth: bluetooth) {})),
                 ("about", AnyView(AboutView(bluetooth: bluetooth) {})),
                 ("wizard", AnyView(WizardView(bluetooth: bluetooth) {})),
             ]

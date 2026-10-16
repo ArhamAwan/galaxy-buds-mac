@@ -23,9 +23,9 @@ final class DiagnosticsLog: @unchecked Sendable {
     private let started = Date()
 
     /// Mirrored to the unified log so the trail survives a crash and can be read
-    /// with `log show --predicate 'subsystem == "com.nivorbit.galaxybuds"'` when a
+    /// with `log show --predicate 'subsystem == "com.nivorbit.budsy"'` when a
     /// reporter can't reach the About page.
-    private let logger = Logger(subsystem: "com.nivorbit.galaxybuds", category: "connection")
+    private let logger = Logger(subsystem: "com.nivorbit.budsy", category: "connection")
 
     private let formatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -61,7 +61,7 @@ final class DiagnosticsLog: @unchecked Sendable {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
 
         return """
-            Galaxy Buds for Mac \(version) (\(build))
+            Budsy \(version) (\(build))
             macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion)
             Uptime \(Int(Date().timeIntervalSince(started)))s
             \(deviceSummary)

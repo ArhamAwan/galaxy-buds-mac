@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-# Builds the app, names it "Galaxy Buds.app", and produces a distributable
+# Builds the app, names it "Budsy.app", and produces a distributable
 # drag-to-Applications .dmg in dist/.
 
-APP_NAME="Galaxy Buds"
+APP_NAME="Budsy"
 VERSION="${1:-1.0.0}"
 DIST="dist"
 STAGE="$DIST/stage"
-DMG="$DIST/Galaxy-Buds-$VERSION.dmg"
+DMG="$DIST/Budsy-$VERSION.dmg"
 
 echo "==> Building…"
 bash build.sh
@@ -16,7 +16,7 @@ bash build.sh
 echo "==> Staging $APP_NAME.app…"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
-cp -R "BudsApp.app" "$STAGE/$APP_NAME.app"
+cp -R "Budsy.app" "$STAGE/$APP_NAME.app"
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> Creating .dmg…"

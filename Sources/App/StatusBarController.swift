@@ -88,7 +88,7 @@ final class StatusBarController {
 
     private func applyIcon(to button: NSStatusBarButton) {
         for name in ["airpodspro", "airpods", "headphones"] {
-            if let image = NSImage(systemSymbolName: name, accessibilityDescription: "Galaxy Buds") {
+            if let image = NSImage(systemSymbolName: name, accessibilityDescription: "Budsy") {
                 image.isTemplate = true
                 button.image = image
                 return

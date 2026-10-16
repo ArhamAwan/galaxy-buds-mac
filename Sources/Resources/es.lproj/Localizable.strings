@@ -1,4 +1,4 @@
-"Welcome to BudsApp" = "Bienvenido a BudsApp";
+"Welcome to Budsy" = "Bienvenido a Budsy";
 "Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more." = "Conecta tus Samsung Galaxy Buds\npara ver la batería, control ANC y más.";
 "Get Started" = "Comenzar";
 "Select Your Model" = "Selecciona tu modelo";
@@ -43,7 +43,7 @@
 "Find Buds" = "Buscar";
 "Stop Find" = "Detener";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "No se encontró el servicio de control de los Galaxy Buds. Prueba a eliminar y volver a emparejar los auriculares en Ajustes del sistema → Bluetooth.";
-"Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Permiso de Bluetooth denegado. Permite BudsApp en Ajustes del sistema → Privacidad y seguridad → Bluetooth.";
+"Bluetooth permission denied. Allow Budsy under System Settings → Privacy & Security → Bluetooth." = "Permiso de Bluetooth denegado. Permite Budsy en Ajustes del sistema → Privacidad y seguridad → Bluetooth.";
 "Bluetooth is off. Please turn it on." = "El Bluetooth está apagado. Por favor, actívalo.";
 "Listen mode" = "Modo de escucha";
 "Play sound" = "Reproducir sonido";
@@ -101,7 +101,7 @@
 "Adjust fit" = "Ajustar";
 "Test failed" = "Prueba fallida";
 "Quit" = "Salir";
-"Quit Galaxy Buds" = "Salir de Galaxy Buds";
+"Quit Budsy" = "Salir de Budsy";
 
 "To phone" = "Al teléfono";
 "Audio on phone" = "Audio en el teléfono";

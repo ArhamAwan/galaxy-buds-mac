@@ -1,4 +1,4 @@
-"Welcome to BudsApp" = "欢迎使用 BudsApp";
+"Welcome to Budsy" = "欢迎使用 Budsy";
 "Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more." = "连接你的三星 Galaxy Buds，\n查看电量、控制 ANC 等。";
 "Get Started" = "开始";
 "Select Your Model" = "选择你的型号";
@@ -43,7 +43,7 @@
 "Find Buds" = "查找耳机";
 "Stop Find" = "停止查找";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "未找到 Galaxy Buds 控制服务。请尝试在系统设置 → 蓝牙中移除并重新配对耳机。";
-"Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "蓝牙权限被拒绝。请在系统设置 → 隐私与安全性 → 蓝牙中允许 BudsApp。";
+"Bluetooth permission denied. Allow Budsy under System Settings → Privacy & Security → Bluetooth." = "蓝牙权限被拒绝。请在系统设置 → 隐私与安全性 → 蓝牙中允许 Budsy。";
 "Bluetooth is off. Please turn it on." = "蓝牙已关闭。请将其打开。";
 "Listen mode" = "聆听模式";
 "Play sound" = "播放声音";
@@ -101,7 +101,7 @@
 "Adjust fit" = "调整佩戴";
 "Test failed" = "测试失败";
 "Quit" = "退出";
-"Quit Galaxy Buds" = "退出 Galaxy Buds";
+"Quit Budsy" = "退出 Budsy";
 
 "To phone" = "发送到手机";
 "Audio on phone" = "音频在手机上";

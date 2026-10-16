@@ -3,12 +3,13 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private static let showPanelNotification = Notification.Name("com.nivorbit.galaxybuds.showPanel")
-    /// The identifier used before 1.3.0. A copy of that build may still be
-    /// running (a stale login item, say), and it holds the one RFCOMM channel
-    /// to the buds — so it counts as "already running" for the single-instance
-    /// check even though its bundle id no longer matches ours.
-    private static let legacyBundleIdentifier = "com.nivorbit.budsapp"
+    private static let showPanelNotification = Notification.Name("com.nivorbit.budsy.showPanel")
+    /// The identifiers used before 1.3.0 and before the Budsy rename. A copy
+    /// of either build may still be running (a stale login item, say), and it
+    /// holds the one RFCOMM channel to the buds — so it counts as "already
+    /// running" for the single-instance check even though its bundle id no
+    /// longer matches ours.
+    private static let legacyBundleIdentifiers = ["com.nivorbit.budsapp", "com.nivorbit.galaxybuds"]
 
     private var statusBarController: StatusBarController?
     private let bluetooth = BluetoothManager()
@@ -24,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // and quit. Two instances would fight over the one RFCOMM channel to
         // the buds and show duplicate menu-bar icons.
         let me = NSRunningApplication.current
-        let identifiers = [me.bundleIdentifier, Self.legacyBundleIdentifier].compactMap { $0 }
+        let identifiers = [me.bundleIdentifier].compactMap { $0 } + Self.legacyBundleIdentifiers
         let others = identifiers
             .flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
             .filter { $0 != me }
@@ -76,6 +77,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// `budsy://demo` puts the app in demo mode: a stand-in connected device
+    /// so every screen can be seen without Galaxy Buds — App Review has none.
+    /// Disconnecting leaves demo mode.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme == "budsy" && $0.host == "demo" }) else { return }
+        bluetooth.enterDemoMode()
+        statusBarController?.showPanel()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         statusBarController?.showPanel()
         return true
@@ -88,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appMenu = NSMenu()
         appMenu.addItem(
-            withTitle: String(localized: "Quit Galaxy Buds"),
+            withTitle: String(localized: "Quit Budsy"),
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )

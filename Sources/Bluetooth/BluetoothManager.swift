@@ -498,6 +498,36 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         lastAutoAttempt = Date().addingTimeInterval(5 - autoConnectCooldown)
     }
 
+    /// Pretends a Buds4 Pro is connected, with plausible status, so every
+    /// screen can be shown without hardware — App Review has no Galaxy Buds,
+    /// and the previews are rendered from the same state. Controls update the
+    /// local status as usual; with no channel open nothing is sent. Auto-
+    /// connect stays out of the way because `isConnected` is true, and
+    /// `disconnect()` leaves demo mode like any other disconnect.
+    func enterDemoMode() {
+        DiagnosticsLog.shared.log("demo mode: stand-in device")
+        cancelAttemptTimeout()
+        isConnecting = false
+        connectedModel = .buds4Pro
+        connectedName = "Galaxy Buds4 Pro"
+        var demo = BudsStatus()
+        demo.batteryLeft = 77
+        demo.batteryRight = 70
+        demo.batteryCase = 79
+        demo.isLeftWearing = true
+        demo.isRightWearing = true
+        demo.noiseControlMode = .anc
+        demo.ancLevel = 4
+        demo.equalizerPreset = .bassBoost
+        demo.softwareVersion = "R640XXU0AZD2"
+        demo.serialLeft = "R3AR20ABCDE"
+        demo.serialRight = "R3AR20FGHIJ"
+        demo.seamlessConnectionEnabled = true
+        status = demo
+        isConnected = true
+        connectionError = nil
+    }
+
     /// Polled (~every 2s) by the app: connects to an already-connected paired
     /// Galaxy Buds. More reliable than IOBluetooth connect notifications, which
     /// don't fire dependably on all macOS versions.
@@ -1065,12 +1095,11 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     // MARK: - Custom EQ persistence
 
     /// UserDefaults key for the persisted custom EQ band table.
-    private let customEQKey = "com.nivorbit.galaxybuds.customEqualizerBands"
-    /// Where the curve lived before the bundle identifier changed. Preferences
-    /// are keyed by bundle id, so an upgrade lands in an empty domain and the
-    /// user's curve would silently reset without this.
-    private let legacyDomain = "com.nivorbit.budsapp"
-    private let legacyCustomEQKey = "com.nivorbit.budsapp.customEqualizerBands"
+    private let customEQKey = "com.nivorbit.budsy.customEqualizerBands"
+    /// Where the curve lived under the two earlier bundle identifiers.
+    /// Preferences are keyed by bundle id, so an upgrade lands in an empty
+    /// domain and the user's curve would silently reset without this.
+    private let legacyDomains = ["com.nivorbit.galaxybuds", "com.nivorbit.budsapp"]
 
     /// Loads the saved custom EQ bands into `status`, if any. Called once on
     /// startup so the user's last custom curve survives reconnects/restarts.
@@ -1087,13 +1116,16 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// identifier. Copies rather than moves: the old domain is left intact so a
     /// downgrade still finds it.
     private func migrateCustomEqualizer() {
-        guard let legacy = UserDefaults(suiteName: legacyDomain),
-              let saved = legacy.array(forKey: legacyCustomEQKey) as? [Int],
-              saved.count == 9
-        else { return }
-        status.customEqualizerBands = saved
-        UserDefaults.standard.set(saved, forKey: customEQKey)
-        DiagnosticsLog.shared.log("migrated custom EQ curve from \(legacyDomain)")
+        for domain in legacyDomains {
+            guard let legacy = UserDefaults(suiteName: domain),
+                  let saved = legacy.array(forKey: "\(domain).customEqualizerBands") as? [Int],
+                  saved.count == 9
+            else { continue }
+            status.customEqualizerBands = saved
+            UserDefaults.standard.set(saved, forKey: customEQKey)
+            DiagnosticsLog.shared.log("migrated custom EQ curve from \(domain)")
+            return
+        }
     }
 
     private func saveCustomEqualizer(_ bands: [Int]) {
@@ -1304,7 +1336,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 self.isScanning = false
                 self.pendingScan = false
                 self.connectionError = String(
-                    localized: "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth.")
+                    localized: "Bluetooth permission denied. Allow Budsy under System Settings → Privacy & Security → Bluetooth.")
             case .poweredOff:
                 self.bluetoothReady = false
                 self.isScanning = false

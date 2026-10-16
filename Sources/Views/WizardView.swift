@@ -73,7 +73,7 @@ struct WizardView: View {
 
             heroGlyph("airpodspro", color: tint)
 
-            Text("Welcome to BudsApp")
+            Text("Welcome to Budsy")
                 .font(.system(size: 15, weight: .semibold))
 
             Text("Connect your Samsung Galaxy Buds\nfor battery info, ANC controls, and more.")
