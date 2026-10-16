@@ -52,6 +52,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.statusBarController?.showPanel()
         }
         startObservingStatus()
+        observeSleepAndWake()
+        LaunchAtLogin.restoreIfNeeded()
+    }
+
+    private func observeSleepAndWake() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.bluetooth.prepareForSleep() }
+        }
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.bluetooth.resumeAfterWake() }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {

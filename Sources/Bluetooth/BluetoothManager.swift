@@ -54,6 +54,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// Bumped per `connect()` so a timed-out attempt's stale resolve task can't
     /// resurrect a connection the manager has already moved past.
     private var connectGeneration = 0
+    /// Skip the cached SDP record on the next attempt. After sleep or a dropped
+    /// link the buds can come back on a different RFCOMM channel while macOS
+    /// still serves the old record; the cache hit returned before any fresh
+    /// query ran, so every retry dialled the dead channel and the manual
+    /// "Connect" kept spinning without ever succeeding.
+    private var preferFreshSDP = false
     /// While true, the buds were intentionally handed off to the phone: the Mac
     /// drops the full Bluetooth link (A2DP audio + SPP control) so the buds fall
     /// back to the phone, and auto-reconnect is suppressed until the user
@@ -243,7 +249,11 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         let target = device.device
         let uuidStrings = model.serviceUUIDCandidates
         let generation = connectGeneration
-        DiagnosticsLog.shared.log("attempt \(connectRetryCount + 1)/\(maxConnectRetries + 1) started")
+        // A retry means the last channel didn't answer, so don't trust the
+        // record it came from either.
+        let useCachedSDP = connectRetryCount == 0 && !preferFreshSDP
+        DiagnosticsLog.shared.log(
+            "attempt \(connectRetryCount + 1)/\(maxConnectRetries + 1) started, cached SDP \(useCachedSDP ? "allowed" : "skipped")")
         startAttemptTimeout(device: device, model: model, generation: generation)
 
         // Resolve the RFCOMM channel off the main thread: this ensures the
@@ -252,7 +262,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // so its data callbacks bind to the always-pumping main run loop.
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let channelId = self.resolveChannel(target: target, uuidStrings: uuidStrings)
+            let channelId = self.resolveChannel(
+                target: target, uuidStrings: uuidStrings, useCache: useCachedSDP)
             await MainActor.run {
                 guard self.isConnecting, self.connectGeneration == generation else { return }
                 if let channelId {
@@ -330,7 +341,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// background thread; returns nil if the channel can't be resolved.
     private nonisolated func resolveChannel(
         target: IOBluetoothDevice,
-        uuidStrings: [String]
+        uuidStrings: [String],
+        useCache: Bool
     ) -> BluetoothRFCOMMChannelID? {
         if !target.isConnected() {
             let started = Date()
@@ -351,7 +363,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // The original 2.5s window was too short — the buds often take 3-5s to
         // expose their SPP service after the baseband link comes up, especially
         // when recovering from a phone multipoint session.
-        if let match = firstChannel(on: target, uuids: uuids) {
+        if useCache, let match = firstChannel(on: target, uuids: uuids) {
             DiagnosticsLog.shared.log("SPP found in cached SDP: \(match.string) → rfcomm \(match.channel)")
             return match.channel
         }
@@ -450,6 +462,40 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         suppressAutoConnect = false
         lastAutoAttempt = nil
         pollAutoConnect()
+    }
+
+    /// Drops the control channel before the Mac sleeps. The link doesn't survive
+    /// sleep, and a channel left half-open (no close callback arrives on some
+    /// macOS builds) kept `rfcommChannel` set, which the poll reads as "still
+    /// connected" and never reconnects.
+    func prepareForSleep() {
+        DiagnosticsLog.shared.log("system will sleep: closing control channel")
+        connectGeneration &+= 1
+        cancelAttemptTimeout()
+        rfcommChannel?.close()
+        rfcommChannel = nil
+        isConnected = false
+        isConnecting = false
+        silentConnect = false
+        preferFreshSDP = true
+        firmware.connectionLost()
+    }
+
+    /// Reconnects shortly after wake. The Bluetooth stack needs a few seconds to
+    /// come back, so the first attempt is held back rather than fired into a
+    /// controller that isn't up yet and then parked behind the cooldown.
+    func resumeAfterWake() {
+        DiagnosticsLog.shared.log("system did wake: reconnecting soon")
+        // The sleep notification isn't delivered on every path (a lid close
+        // during a long operation, say), so a link that silently died while
+        // we slept would still read as connected here. Drop it if the channel
+        // isn't actually open any more.
+        if rfcommChannel != nil, rfcommChannel?.isOpen() != true {
+            DiagnosticsLog.shared.log("channel did not survive sleep")
+            prepareForSleep()
+        }
+        preferFreshSDP = true
+        lastAutoAttempt = Date().addingTimeInterval(5 - autoConnectCooldown)
     }
 
     /// Polled (~every 2s) by the app: connects to an already-connected paired
@@ -785,6 +831,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         cancelAttemptTimeout()
         isConnecting = false
         silentConnect = false
+        preferFreshSDP = false
         isConnected = true
         // A silent attempt no longer clears the error up front, so clear it here
         // once one actually succeeds.
@@ -925,13 +972,31 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Software version for Buds3/4 Pro: 20 ASCII bytes at offset 2, nulls stripped.
+    /// Software version from DEBUG_GET_ALL_DATA. Buds3/4 Pro put 20 ASCII bytes
+    /// at offset 2, but older models (Buds2, Buds2 Pro) lay the payload out
+    /// differently, and decoding that fixed window as text showed binary noise
+    /// as the version. Look for the Samsung build name (e.g. "R510XXU0AWE1")
+    /// anywhere in the payload instead; leave the version empty when there's
+    /// none, which also keeps the firmware check from comparing against junk.
     private func parseGetAllData(_ payload: Data) {
-        guard payload.count >= 22 else { return }
-        let bytes = payload[(payload.startIndex + 2)..<(payload.startIndex + 22)]
-        let filtered = bytes.filter { $0 != 0 }
-        status.softwareVersion = String(decoding: filtered, as: UTF8.self)
-        DiagnosticsLog.shared.log("software version: \(status.softwareVersion)")
+        if let version = Self.firmwareBuildName(in: payload) {
+            status.softwareVersion = version
+            DiagnosticsLog.shared.log("software version: \(version)")
+        } else {
+            let hex = payload.prefix(48).map { String(format: "%02x", $0) }.joined()
+            DiagnosticsLog.shared.log("software version: not found in \(payload.count)-byte payload \(hex)")
+        }
+    }
+
+    /// The first Samsung firmware build name in `payload`: a letter, three
+    /// digits, then eight uppercase letters or digits.
+    nonisolated static func firmwareBuildName(in payload: Data) -> String? {
+        let text = String(payload.map { byte -> Character in
+            (0x20...0x7E).contains(byte) ? Character(UnicodeScalar(byte)) : " "
+        })
+        guard let range = text.range(of: "[A-Z][0-9]{3}[A-Z0-9]{8}", options: .regularExpression)
+        else { return nil }
+        return String(text[range])
     }
 
     /// Left/right serial numbers: 11 ASCII bytes each.
@@ -1285,6 +1350,7 @@ extension BluetoothManager: IOBluetoothRFCOMMChannelDelegate {
         Task { @MainActor in
             self.isConnected = false
             self.rfcommChannel = nil
+            self.preferFreshSDP = true
             self.firmware.connectionLost()
         }
     }

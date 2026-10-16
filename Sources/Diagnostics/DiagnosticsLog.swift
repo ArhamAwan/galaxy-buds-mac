@@ -36,7 +36,10 @@ final class DiagnosticsLog: @unchecked Sendable {
 
     func log(_ message: @autoclosure () -> String) {
         let text = message()
-        logger.info("\(text, privacy: .public)")
+        // `.notice` (the default level) is persisted to disk; `.info` only
+        // lives in a memory buffer, which made `log show` come back empty for
+        // every report that couldn't reach the About page.
+        logger.notice("\(text, privacy: .public)")
         let line = "[\(formatter.string(from: Date()))] \(text)"
         lock.lock()
         lines.append(line)

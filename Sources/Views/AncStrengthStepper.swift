@@ -34,10 +34,18 @@ struct AncStrengthStepper: View {
 
     private var track: some View {
         ZStack {
-            Capsule()
-                .fill(Color.secondary.opacity(0.2))
-                .frame(height: 4)
-                .padding(.horizontal, 9)
+            // The rail runs from the first step's centre to the last one's.
+            // Each step sits in the middle of an equal-width cell, so that is
+            // half a cell in from either edge — a fixed inset left the rail
+            // hanging past the end dots on wide layouts.
+            GeometryReader { geometry in
+                let inset = geometry.size.width / CGFloat(max(count, 1)) / 2
+                Capsule()
+                    .fill(Color.secondary.opacity(0.2))
+                    .frame(height: 4)
+                    .padding(.horizontal, inset)
+                    .frame(height: geometry.size.height)
+            }
             HStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { step in
                     Button { onChange(step) } label: {

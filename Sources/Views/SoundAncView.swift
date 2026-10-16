@@ -56,17 +56,19 @@ struct SoundAncView: View {
             // Strength only applies while ANC is the active mode; adaptive
             // chooses its own. Dimmed to match the panel and the dashboard.
             let ancActive = status.noiseControlMode == .anc
-            row("ANC strength") {
-                AncStrengthStepper(
-                    level: status.ancLevel,
-                    count: bluetooth.connectedModel?.ancLevelCount ?? 2,
-                    tint: tint
-                ) { bluetooth.setAncLevel($0) }
-                .frame(width: 150)
+            if bluetooth.connectedModel?.supportsAncStrength == true {
+                row("ANC strength") {
+                    AncStrengthStepper(
+                        level: status.ancLevel,
+                        count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+                        tint: tint
+                    ) { bluetooth.setAncLevel($0) }
+                    .frame(width: 150)
+                }
+                .disabled(!ancActive)
+                .opacity(ancActive ? 1 : 0.4)
+                Divider()
             }
-            .disabled(!ancActive)
-            .opacity(ancActive ? 1 : 0.4)
-            Divider()
             toggleRow("Noise control with one earbud",
                       isOn: status.ncWithOneEarbud) { bluetooth.setNoiseControlWithOneEarbud($0) }
         }

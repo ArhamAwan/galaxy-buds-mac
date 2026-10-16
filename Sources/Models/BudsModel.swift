@@ -88,12 +88,27 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         self == .buds
     }
 
+    /// Whether the model takes the Off / Ambient / ANC switch (NOISE_CONTROLS).
+    /// Buds2 and Buds FE have both ANC and ambient sound on the same message as
+    /// the Pro models; Buds Live is left out because its ANC is a separate
+    /// on/off message with no ambient mode.
     var supportsANC: Bool {
         switch self {
-        case .budsPro, .buds2Pro, .buds3, .buds3Pro, .buds3Fe, .buds4, .buds4Pro:
+        case .budsPro, .buds2, .buds2Pro, .budsFe, .buds3, .buds3Pro, .buds3Fe, .buds4, .buds4Pro:
             return true
         default:
             return false
+        }
+    }
+
+    /// Whether ANC has an adjustable strength. Buds2 and Buds FE only switch it
+    /// on or off.
+    var supportsAncStrength: Bool {
+        switch self {
+        case .buds2, .budsFe:
+            return false
+        default:
+            return supportsANC
         }
     }
 

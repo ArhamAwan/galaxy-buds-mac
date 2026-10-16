@@ -66,8 +66,10 @@ struct DashboardView: View {
 
             if supportsAnc {
                 nodeSelector
-                Divider()
-                ancStrengthRow
+                if bluetooth.connectedModel?.supportsAncStrength == true {
+                    Divider()
+                    ancStrengthRow
+                }
                 if bluetooth.connectedModel?.supportsDetectConversations == true {
                     Divider()
                     autoSwitchRow

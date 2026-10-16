@@ -50,7 +50,9 @@ struct MenuPopoverView: View {
 
             if bluetooth.connectedModel?.supportsANC == true {
                 listenMode
-                ancStrength
+                if bluetooth.connectedModel?.supportsAncStrength == true {
+                    ancStrength
+                }
             }
 
             equalizerRow
