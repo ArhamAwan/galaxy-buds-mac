@@ -12,8 +12,8 @@
 #   brew install --cask vedatkilic/tap/galaxy-buds
 
 cask "galaxy-buds" do
-  version "1.4.0"
-  sha256 "87885aa52caedf0b9a1ead4676fd743d6cf0ead7f200b841b92bf4f30e5ffc1d"
+  version "1.4.1"
+  sha256 "72cf1dc3d65a4c2e295c15117c0cc5b5357006fae726466e1c722261b8c43119"
 
   url "https://github.com/vedatkilic/galaxy-buds-mac/releases/download/v#{version}/Galaxy-Buds-#{version}.dmg"
   name "Galaxy Buds"
