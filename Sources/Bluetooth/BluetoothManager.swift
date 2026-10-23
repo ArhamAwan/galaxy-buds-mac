@@ -126,6 +126,15 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// for future connections.
     func startAutoConnect() {
         autoConnectArmed = true
+        // React the moment macOS connects the buds (they appear as an audio
+        // device), instead of waiting for the next poll.
+        BluetoothAudio.observeDeviceChanges { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lastAutoAttempt = nil
+                self.pollAutoConnect()
+            }
+        }
         loadCustomEqualizer()
         primeBluetoothPermission()
         if bluetoothReady { armConnectNotifications() }
@@ -163,13 +172,15 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             candidates = [justConnected]
         } else {
             let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
-            candidates = paired.filter { $0.isConnected() }
+            candidates = paired.filter { BluetoothAudio.macHasLink(to: $0) }
         }
         for device in candidates where isGalaxyBudsName(device.name ?? "") {
             autoConnectShouldNotify = notify
             let model = BudsModel.detect(from: device.name ?? "") ?? .buds4Pro
+            // A connect notification means macOS itself just linked the buds,
+            // so bringing up our channel can't steal them from the phone.
             connect(to: DiscoveredDevice(device: device), model: model,
-                    silent: true, allowPaging: false)
+                    silent: true, allowPaging: justConnected != nil)
             return
         }
     }
@@ -358,7 +369,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // Without a link of our own, both openConnection and an SDP query would
         // page the buds and drag them over from the phone. Background attempts
         // stop here; only a user-initiated connect may bring the link up.
-        if !allowPaging && !target.isConnected() {
+        if !allowPaging && !BluetoothAudio.macHasLink(to: target) {
             DiagnosticsLog.shared.log("auto-connect: buds not connected to this Mac, not paging them")
             return nil
         }
@@ -516,7 +527,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // Only attach when macOS itself already has the buds connected (you
         // picked the Mac, or they switched over on their own). Paging them
         // from here used to steal them from a phone they were in use with.
-        guard device.isConnected() else {
+        guard BluetoothAudio.macHasLink(to: device) else {
             notePollSkip("buds not connected to this Mac")
             return
         }
