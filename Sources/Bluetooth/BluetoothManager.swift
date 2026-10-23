@@ -580,6 +580,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             payload: Data([UInt8(mode.rawValue)])
         )
         sendMessage(msg)
+        DiagnosticsLog.shared.log("listen mode: app set \(mode.displayName)")
         // Reflect immediately; the buds also echo via NOISE_CONTROLS_UPDATE.
         status.noiseControlMode = mode
     }
@@ -630,9 +631,15 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.ambientTone = tone
     }
 
+    /// Remembers the user's own choice, so the app can put it back if
+    /// something else (e.g. the phone's Galaxy Wearable app) turns it on again.
+    private static let detectConversationsChoiceKey = "detectConversationsChoice"
+
     func setDetectConversations(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: Self.detectConversationsChoiceKey)
         sendMessage(SppMessage(messageId: .setDetectConversations, payload: Data([enabled ? 1 : 0])))
         status.detectConversations = enabled
+        DiagnosticsLog.shared.log("conversation detect: app set \(enabled ? "on" : "off")")
     }
 
     /// Conversation-detect timeout: 0 = 5s, 1 = 10s, 2 = 15s.
@@ -959,6 +966,10 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             // Pushed when the user changes ANC on the earbud itself.
             if !message.payload.isEmpty,
                let mode = NoiseControlMode(rawValue: Int(message.payload[0])) {
+                if mode != status.noiseControlMode {
+                    DiagnosticsLog.shared.log(
+                        "listen mode: buds switched to \(mode.displayName) (was \(status.noiseControlMode.displayName))")
+                }
                 status.noiseControlMode = mode
             }
         case .debugGetAllData:
@@ -1177,7 +1188,11 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             status.equalizerPreset = EqualizerPreset(rawValue: eqMode) ?? .off
             status.customEqualizerEnabled = false
         }
-        status.noiseControlMode = NoiseControlMode(rawValue: Int(payload[12])) ?? .off
+        let reportedMode = NoiseControlMode(rawValue: Int(payload[12])) ?? .off
+        if reportedMode != status.noiseControlMode {
+            DiagnosticsLog.shared.log("listen mode: buds report \(reportedMode.displayName)")
+        }
+        status.noiseControlMode = reportedMode
 
         // Device color: the left earbud's colour sits as a little-endian Int16
         // at payload[14..16]. We only need the low byte to resolve our enum, and
@@ -1224,7 +1239,20 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             DiagnosticsLog.shared.log("ANC strength: device reports step \(v)")
             status.ancLevel = v
         }
-        if let v = byte(26) { status.detectConversations = v == 1 }
+        if let v = byte(26) {
+            let on = v == 1
+            if on != status.detectConversations {
+                DiagnosticsLog.shared.log("conversation detect: buds report \(on ? "on" : "off")")
+            }
+            status.detectConversations = on
+            // Turned off here but back on in the buds (another device changed
+            // it): honour the user's choice and switch it off again.
+            if on, UserDefaults.standard.object(forKey: Self.detectConversationsChoiceKey) as? Bool == false {
+                DiagnosticsLog.shared.log("conversation detect: turned off in the app, turning it off again")
+                sendMessage(SppMessage(messageId: .setDetectConversations, payload: Data([0])))
+                status.detectConversations = false
+            }
+        }
         if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
         // rev8+: one-earbud NC + ambient customisation.
         if let v = byte(32) { status.ncWithOneEarbud = v == 1 }
