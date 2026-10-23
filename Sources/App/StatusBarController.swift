@@ -316,7 +316,10 @@ final class StatusBarController {
 
     func updateIcon(connected: Bool, batteryLeft: Int, batteryRight: Int) {
         guard let button = statusItem?.button else { return }
-        let battery = connected ? "\(min(batteryLeft, batteryRight))%" : ""
+        // Lowest charge among the buds that are actually reporting: a bud in
+        // the case or out of range reads 0, which used to show "0%" here.
+        let levels = [batteryLeft, batteryRight].filter { $0 > 0 }
+        let battery = connected ? (levels.min().map { "\($0)%" } ?? "") : ""
         if button.image != nil {
             // The SF Symbol is always visible; show battery beside it when connected.
             button.title = battery.isEmpty ? "" : " \(battery)"
